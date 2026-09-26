@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Kaspin POS scheduled ingestion and Telegram control
+
+Parameters:
+  BaseUrl:
+    Type: String
+  InitialAccessToken:
+    Type: String
+    NoEcho: true
+  InitialRefreshToken:
+    Type: String
+    NoEcho: true
+  SupabaseUrl:
+    Type: String
+  SupabaseSecretKey:
+    Type: String
+    NoEcho: true
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+  TelegramWebhookSecret:
+    Type: String
+    NoEcho: true
+  TelegramAllowedChatId:
+    Type: String
+  RefreshTime:
+    Type: String
+    Default: "3"
+  PosUtcOffset:
+    Type: String
+    Default: "+07:00"
+  PosTimeZone:
+    Type: String
+    Default: Asia/Jakarta
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+      - arm64
+    MemorySize: 128
+    Environment:
+      Variables:
+        BASE_URL: !Ref BaseUrl
+        TOKEN: !Ref InitialAccessToken
+        REFRESH_TOKEN: !Ref InitialRefreshToken
+        REFRESH_TIME: !Ref RefreshTime
+        POS_UTC_OFFSET: !Ref PosUtcOffset
+        POS_TIME_ZONE: !Ref PosTimeZone
+        SUPABASE_URL: !Ref SupabaseUrl
+        SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
+        TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+        TELEGRAM_WEBHOOK_SECRET: !Ref TelegramWebhookSecret
+        TELEGRAM_ALLOWED_CHAT_ID: !Ref TelegramAllowedChatId
+
+Resources:
+  PosPollingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-pos-poller"
+      RetentionInDays: 7
+
+  PosPollingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-pos-poller"
+      CodeUri: .
+      Handler: aws/lambda/worker.handler
+      Timeout: 58
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref PosPollingLogGroup
+      Events:
+        EveryMinute:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Enabled: true
+            RetryPolicy:
+              MaximumRetryAttempts: 0
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - aws/lambda/worker.ts
+        Minify: true
+        Sourcemap: false
+        Target: es2022
+
+  TelegramLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-telegram"
+      RetentionInDays: 7
+
+  TelegramWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-telegram"
+      CodeUri: .
+      Handler: aws/lambda/telegram.handler
+      Timeout: 60
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref TelegramLogGroup
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - aws/lambda/telegram.ts
+        Minify: true
+        Sourcemap: false
+        Target: es2022
+
+Outputs:
+  TelegramWebhookUrl:
+    Description: Register this HTTPS URL with Telegram setWebhook.
+    Value: !GetAtt TelegramWebhookFunctionUrl.FunctionUrl
+  PollingFunctionName:
+    Description: Lambda function that polls the POS during each minute.
+    Value: !Ref PosPollingFunction
