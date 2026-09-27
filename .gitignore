@@ -7,3 +7,6 @@ coverage/
 api.json
 .aws-sam/
 samconfig.toml
+.DS_Store
+aws/lambda/*.zip
+worker.js.zip

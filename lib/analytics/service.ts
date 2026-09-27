@@ -1,4 +1,5 @@
 import { refreshIntervalSeconds } from "@/lib/env";
+import { summarizeStore, type Store } from "@/lib/stores";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { summarizeHourlyItems } from "./aggregate";
 import type { DailyAnalytics, HourlyItemSale } from "./types";
@@ -12,7 +13,7 @@ type HourlyViewRow = {
   revenue: number;
 };
 
-async function loadAllHourlyRows(date: string): Promise<HourlyViewRow[]> {
+async function loadAllHourlyRows(storeId: string, date: string): Promise<HourlyViewRow[]> {
   const supabase = getSupabaseAdmin();
   const pageSize = 1_000;
   const rows: HourlyViewRow[] = [];
@@ -21,6 +22,7 @@ async function loadAllHourlyRows(date: string): Promise<HourlyViewRow[]> {
     const { data, error } = await supabase
       .from("pos_hourly_item_sales")
       .select("item_code,item_name,category,business_hour,quantity,revenue")
+      .eq("store_id", storeId)
       .eq("business_date", date)
       .order("item_code", { ascending: true })
       .order("business_hour", { ascending: true })
@@ -33,19 +35,26 @@ async function loadAllHourlyRows(date: string): Promise<HourlyViewRow[]> {
   }
 }
 
-export async function getDailyAnalytics(date: string): Promise<DailyAnalytics> {
+export async function getDailyAnalytics(
+  store: Store,
+  date: string,
+  stores: Store[] = [store],
+): Promise<DailyAnalytics> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Date must use YYYY-MM-DD");
   const supabase = getSupabaseAdmin();
 
   const [hourlyRows, transactionsResult, syncResult] = await Promise.all([
-    loadAllHourlyRows(date),
+    loadAllHourlyRows(store.id, date),
     supabase
       .from("pos_transactions")
       .select("transaction_code", { count: "exact", head: true })
+      .eq("store_id", store.id)
       .eq("business_date", date),
     supabase
       .from("sync_runs")
       .select("completed_at")
+      .eq("store_id", store.id)
+      .eq("business_date", date)
       .eq("status", "success")
       .order("completed_at", { ascending: false })
       .limit(1)
@@ -70,6 +79,8 @@ export async function getDailyAnalytics(date: string): Promise<DailyAnalytics> {
   return {
     date,
     source: "supabase",
+    store: summarizeStore(store),
+    stores: stores.map(summarizeStore),
     transactionCount: transactionsResult.count || 0,
     totalUnits: totals.totalUnits,
     totalRevenue: totals.totalRevenue,

@@ -58,16 +58,18 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
   const maxCell = Math.max(1, ...data.hourlyItems.map((entry) => entry.quantity));
   const hours = Array.from({ length: 24 }, (_, index) => index);
 
-  async function load(nextDate = date, quiet = false) {
+  async function load(nextDate = date, nextStoreId = data.store.id, quiet = false) {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/analytics?date=${encodeURIComponent(nextDate)}`, {
+      const parameters = new URLSearchParams({ date: nextDate, store: nextStoreId });
+      const response = await fetch(`/api/analytics?${parameters.toString()}`, {
         cache: "no-store",
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not refresh analytics");
       setData(payload as DailyAnalytics);
+      setDate(nextDate);
       setSelection(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not refresh analytics");
@@ -78,13 +80,13 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
 
   useEffect(() => {
     const timer = window.setInterval(
-      () => void load(date, true),
+      () => void load(date, data.store.id, true),
       Math.max(3, data.refreshSeconds) * 1000,
     );
     return () => window.clearInterval(timer);
     // Recreate the timer only when the selected date or configured interval changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, data.refreshSeconds]);
+  }, [date, data.refreshSeconds, data.store.id]);
 
   return (
     <main className="shell">
@@ -92,9 +94,28 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
         <div>
           <p className="eyebrow">Kaspin · POS intelligence</p>
           <h1>Daily item pulse</h1>
-          <p className="subtitle">See what sells, and when demand peaks throughout the day.</p>
+          <p className="subtitle">{data.store.name} · See what sells, and when demand peaks.</p>
         </div>
         <div className="date-controls">
+          <div className="control-labels">
+            <label htmlFor="store-select">Store</label>
+            {/* Full navigation allows the browser to present the HTTP Basic Auth prompt. */}
+            <a href="/settings">Store settings</a>
+          </div>
+          <select
+            id="store-select"
+            value={data.store.id}
+            onChange={(event) => {
+              const nextStore = data.stores.find((store) => store.id === event.target.value);
+              if (!nextStore) return;
+              setDate(nextStore.businessDate);
+              void load(nextStore.businessDate, nextStore.id);
+            }}
+          >
+            {data.stores.map((store) => (
+              <option value={store.id} key={store.id}>{store.name} ({store.utcOffset})</option>
+            ))}
+          </select>
           <label htmlFor="business-date">Business date</label>
           <div className="control-row">
             <input
@@ -103,10 +124,10 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
               value={date}
               onChange={(event) => {
                 setDate(event.target.value);
-                void load(event.target.value);
+                void load(event.target.value, data.store.id);
               }}
             />
-            <button type="button" onClick={() => void load()} disabled={loading}>
+            <button type="button" onClick={() => void load(date, data.store.id)} disabled={loading}>
               {loading ? "Refreshing…" : "Refresh view"}
             </button>
           </div>

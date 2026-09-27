@@ -13,6 +13,10 @@ export function posEnv() {
   };
 }
 
+export function posBaseUrl(): string {
+  return required("BASE_URL").replace(/\/$/, "");
+}
+
 export function refreshIntervalSeconds(): number {
   const parsed = Number(process.env.REFRESH_TIME || "3");
   return Number.isFinite(parsed) && parsed >= 3 ? Math.floor(parsed) : 3;

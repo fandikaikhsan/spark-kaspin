@@ -1,4 +1,5 @@
-import { posEnv } from "@/lib/env";
+import { posBaseUrl, posEnv } from "@/lib/env";
+import type { Store } from "@/lib/stores";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { PosListResponse, PosRefreshResponse, PosTransaction } from "./types";
 
@@ -26,10 +27,11 @@ function isUsable(token: string | null, expiresAt: string | null): token is stri
   return Boolean(expiry && expiry.getTime() > Date.now() + 60_000);
 }
 
-async function readCredential(): Promise<StoredCredential | null> {
+async function readCredential(storeId: string): Promise<StoredCredential | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("integration_credentials")
     .select("access_token,refresh_token,access_token_expires_at")
+    .eq("store_id", storeId)
     .eq("provider", "pos")
     .maybeSingle();
 
@@ -37,24 +39,28 @@ async function readCredential(): Promise<StoredCredential | null> {
   return data;
 }
 
-async function saveCredential(accessToken: string, refreshToken: string) {
+async function saveCredential(storeId: string, accessToken: string, refreshToken: string) {
   const { error } = await getSupabaseAdmin().from("integration_credentials").upsert(
     {
+      store_id: storeId,
       provider: "pos",
       access_token: accessToken,
       refresh_token: refreshToken,
       access_token_expires_at: jwtExpiry(accessToken)?.toISOString() ?? null,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "provider" },
+    { onConflict: "store_id,provider" },
   );
 
   if (error) throw new Error(`Could not save refreshed POS credentials: ${error.message}`);
 }
 
-async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const { baseUrl } = posEnv();
-  const response = await fetch(`${baseUrl}/api/refresh-token`, {
+async function refreshAccessToken(
+  store: Store,
+  refreshToken: string,
+  recoverFromRotation = true,
+): Promise<string> {
+  const response = await fetch(`${posBaseUrl()}/api/refresh-token`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${refreshToken}`,
@@ -65,6 +71,14 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
   });
 
   if (!response.ok) {
+    // The scheduled worker and a Telegram sync can overlap. If another invocation
+    // already rotated the refresh token, retry once with the newer Supabase value.
+    if (recoverFromRotation && response.status === 401) {
+      const latest = await readCredential(store.id);
+      if (latest?.refresh_token && latest.refresh_token !== refreshToken) {
+        return refreshAccessToken(store, latest.refresh_token, false);
+      }
+    }
     throw new Error(`POS token refresh failed with HTTP ${response.status}`);
   }
 
@@ -73,36 +87,40 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
     throw new Error("POS token refresh returned an unexpected response");
   }
 
-  await saveCredential(payload.data.token, payload.data.token_refresh);
+  await saveCredential(store.id, payload.data.token, payload.data.token_refresh);
   return payload.data.token;
 }
 
-async function getAccessToken(forceRefresh = false): Promise<string> {
-  const env = posEnv();
-  const stored = await readCredential();
-
+async function getAccessToken(store: Store, forceRefresh = false): Promise<string> {
+  const stored = await readCredential(store.id);
   if (!forceRefresh && stored && isUsable(stored.access_token, stored.access_token_expires_at)) {
     return stored.access_token;
   }
 
-  if (!forceRefresh && isUsable(env.accessToken, null)) {
-    return env.accessToken;
+  // Environment credentials remain a migration fallback for the one default
+  // store. Every additional store keeps its credentials in Supabase.
+  const legacy = store.isDefault ? posEnv() : null;
+  if (!forceRefresh && !stored && legacy && isUsable(legacy.accessToken, null)) {
+    return legacy.accessToken;
   }
 
-  return refreshAccessToken(stored?.refresh_token || env.refreshToken);
+  const refreshToken = stored?.refresh_token || legacy?.refreshToken;
+  if (!refreshToken) {
+    throw new Error(`Store "${store.name}" does not have a POS refresh token`);
+  }
+  return refreshAccessToken(store, refreshToken);
 }
 
-async function authenticatedFetch(path: string): Promise<Response> {
-  const { baseUrl } = posEnv();
-  let token = await getAccessToken();
-  let response = await fetch(`${baseUrl}${path}`, {
+async function authenticatedFetch(store: Store, path: string): Promise<Response> {
+  let token = await getAccessToken(store);
+  let response = await fetch(`${posBaseUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
 
   if (response.status === 401) {
-    token = await getAccessToken(true);
-    response = await fetch(`${baseUrl}${path}`, {
+    token = await getAccessToken(store, true);
+    response = await fetch(`${posBaseUrl()}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
@@ -111,10 +129,14 @@ async function authenticatedFetch(path: string): Promise<Response> {
   return response;
 }
 
-export async function fetchTransactionsForDate(date: string): Promise<PosTransaction[]> {
+export async function fetchTransactionsForDate(
+  store: Store,
+  date: string,
+): Promise<PosTransaction[]> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Date must use YYYY-MM-DD");
   const [year, month, day] = date.split("-");
   const response = await authenticatedFetch(
+    store,
     `/api/web/laporan/penjualan/list-data-penjualan/${year}/${month}/${day}`,
   );
 

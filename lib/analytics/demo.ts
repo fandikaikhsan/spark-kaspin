@@ -2,9 +2,18 @@ import { refreshIntervalSeconds } from "@/lib/env";
 import type { DailyAnalytics } from "./types";
 
 export function demoAnalytics(date: string): DailyAnalytics {
+  const store = {
+    id: "demo-store",
+    name: "Demo store",
+    timeZone: "Asia/Jakarta",
+    utcOffset: "+07:00",
+    businessDate: date,
+  };
   return {
     date,
     source: "demo",
+    store,
+    stores: [store],
     transactionCount: 1,
     totalUnits: 7,
     totalRevenue: 182_724,

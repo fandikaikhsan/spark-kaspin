@@ -1,6 +1,7 @@
 import type { PosTransaction } from "./types";
 
 export type TransactionRow = {
+  store_id: string;
   transaction_code: string;
   receipt_number: number;
   business_date: string;
@@ -12,6 +13,7 @@ export type TransactionRow = {
 };
 
 export type ItemRow = {
+  store_id: string;
   transaction_code: string;
   line_number: number;
   item_code: string;
@@ -24,6 +26,7 @@ export type ItemRow = {
 
 export function normalizeTransactions(
   transactions: PosTransaction[],
+  storeId: string,
   utcOffset: string,
 ): { transactions: TransactionRow[]; items: ItemRow[] } {
   if (!/^[+-]\d{2}:\d{2}$/.test(utcOffset)) {
@@ -39,6 +42,7 @@ export function normalizeTransactions(
 
     const [, businessDate, hour, minute, second] = match;
     transactionRows.push({
+      store_id: storeId,
       transaction_code: transaction.kode,
       receipt_number: transaction.no_struk,
       business_date: businessDate,
@@ -51,6 +55,7 @@ export function normalizeTransactions(
 
     transaction.data_transaksi.forEach((item, lineNumber) => {
       itemRows.push({
+        store_id: storeId,
         transaction_code: transaction.kode,
         line_number: lineNumber,
         item_code: item.kode_barang || `unknown-${lineNumber}`,

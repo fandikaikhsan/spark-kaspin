@@ -1,5 +1,6 @@
 import { refreshIntervalSeconds } from "../../lib/env";
-import { currentBusinessDate, syncPosDate } from "../../lib/sync";
+import { businessDateForTimeZone, listStores, type Store } from "../../lib/stores";
+import { syncPosDate } from "../../lib/sync";
 
 type FunctionUrlEvent = {
   body?: string | null;
@@ -47,6 +48,14 @@ async function sendTelegramMessage(chatId: number, text: string) {
   if (!result.ok) throw new Error(`Telegram sendMessage failed with HTTP ${result.status}`);
 }
 
+function findStore(stores: Store[], identifier: string): Store | null {
+  const normalized = identifier.toLowerCase();
+  const matches = stores.filter(
+    (store) => store.id.startsWith(identifier) || store.name.toLowerCase() === normalized,
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export async function handler(event: FunctionUrlEvent): Promise<FunctionUrlResponse> {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (
@@ -69,22 +78,56 @@ export async function handler(event: FunctionUrlEvent): Promise<FunctionUrlRespo
       return response(200, { ok: true });
     }
 
-    const [command, requestedDate] = message.text.trim().split(/\s+/, 2);
+    const [command, firstArgument, secondArgument] = message.text.trim().split(/\s+/, 3);
+    const stores = await listStores(true);
 
     if (command === "/sync") {
-      const date = requestedDate || currentBusinessDate();
-      const result = await syncPosDate(date, { force: true, trigger: "telegram" });
+      if (!stores.length) {
+        await sendTelegramMessage(message.chat.id, "No active stores are configured.");
+        return response(200, { ok: true });
+      }
+
+      let store: Store | null = stores.length === 1 ? stores[0] : null;
+      let requestedDate: string | undefined;
+      if (stores.length === 1 && firstArgument?.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        requestedDate = firstArgument;
+      } else if (firstArgument) {
+        store = findStore(stores, firstArgument);
+        requestedDate = secondArgument;
+      }
+
+      if (!store) {
+        await sendTelegramMessage(
+          message.chat.id,
+          "Choose a store: /sync <store-id> [YYYY-MM-DD]. Use /stores to list IDs.",
+        );
+        return response(200, { ok: true });
+      }
+
+      const date = requestedDate || businessDateForTimeZone(store.timeZone);
+      const result = await syncPosDate(store, date, { force: true, trigger: "telegram" });
       await sendTelegramMessage(
         message.chat.id,
-        `Sync ${result.status} for ${result.date}: ${result.transactionCount} transactions, ${result.itemCount} item lines.`,
+        `${store.name}: sync ${result.status} for ${result.date}: ${result.transactionCount} transactions, ${result.itemCount} item lines.`,
       );
     } else if (command === "/status") {
+      const lines = stores.map(
+        (store) => `${store.name}: ${businessDateForTimeZone(store.timeZone)} (${store.utcOffset})`,
+      );
       await sendTelegramMessage(
         message.chat.id,
-        `POS ingestion is online. Polling interval: ${refreshIntervalSeconds()} seconds. Business date: ${currentBusinessDate()}.`,
+        `POS ingestion is online. Polling interval: ${refreshIntervalSeconds()} seconds.\n${lines.join("\n")}`,
       );
+    } else if (command === "/stores") {
+      const lines = stores.map(
+        (store) => `${store.id.slice(0, 8)} — ${store.name} (${store.utcOffset})`,
+      );
+      await sendTelegramMessage(message.chat.id, lines.join("\n") || "No active stores configured.");
     } else {
-      await sendTelegramMessage(message.chat.id, "Commands: /sync [YYYY-MM-DD] and /status");
+      await sendTelegramMessage(
+        message.chat.id,
+        "Commands: /stores, /sync <store-id> [YYYY-MM-DD], and /status",
+      );
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Telegram handler failed";

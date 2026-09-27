@@ -1,13 +1,13 @@
 # Kaspin POS analytics
 
-A Next.js dashboard with an AWS Lambda ingestion worker. The worker fetches daily POS transactions every three seconds, refreshes expired POS tokens, and stores normalized data in Supabase. Telegram provides manual `/sync` and `/status` commands through a separate Lambda Function URL.
+A Next.js dashboard with an AWS Lambda ingestion worker. The worker fetches each active store every three seconds, refreshes its expired POS credentials, and stores normalized store-scoped data in Supabase. Telegram provides manual sync and status commands through a separate Lambda Function URL.
 
 ## Architecture
 
 ```text
 EventBridge rule (once/minute)
   └─> 58-second polling Lambda
-        └─> POS every REFRESH_TIME seconds
+        └─> every active store every REFRESH_TIME seconds
               └─> Supabase transactions + hourly view
 
 Telegram webhook ─> Telegram Lambda ─> immediate POS sync ─> Supabase
@@ -15,15 +15,17 @@ Telegram webhook ─> Telegram Lambda ─> immediate POS sync ─> Supabase
 Browser ─> Vercel Next.js dashboard ─> Supabase hourly view
 ```
 
-EventBridge itself has one-minute precision. The scheduled Lambda remains active for most of each minute and runs sequential polling cycles internally. Reserved concurrency is `1`, preventing two scheduled workers from overlapping.
+EventBridge itself has one-minute precision. The scheduled Lambda remains active for most of each minute. Stores are fetched in parallel within each cycle, while requests for an individual store remain sequential. Reserved concurrency is `1`, preventing two scheduled workers from overlapping.
 
 ## Included
 
-- Access-token refresh using the seed `REFRESH_TOKEN`
-- Rotated refresh-token persistence in the private `integration_credentials` table
-- Idempotent transaction and item-line upserts
+- Store settings for branch name, UTC+7/UTC+8 timezone, and seed credentials
+- Access-token refresh using each store's saved refresh token
+- Rotated access- and refresh-token persistence in the private `integration_credentials` table
+- Store-scoped, idempotent transaction and item-line upserts
+- One audit summary per store per Lambda invocation, with 7-day success and 30-day failure retention
 - Three-second scheduled POS ingestion through AWS Lambda
-- Separate Telegram Lambda with `/sync [YYYY-MM-DD]` and `/status`
+- Separate Telegram Lambda with `/stores`, `/sync`, and `/status`
 - Supabase RLS, revoked public grants, and hourly aggregation view
 - Responsive daily metrics and item-by-hour heatmap
 - Demo dashboard data until Supabase is configured
@@ -38,6 +40,14 @@ EventBridge itself has one-minute precision. The scheduled Lambda remains active
    - A server-side secret key beginning with `sb_secret_` → `SUPABASE_SECRET_KEY`
 
 Do not use a publishable or anonymous key for the worker. The secret key bypasses RLS and must only exist in Lambda and server-side Vercel variables.
+
+### Upgrade an existing single-store database
+
+Temporarily disable the EventBridge schedule, then run
+[`supabase/migrations/20260927_multi_store.sql`](supabase/migrations/20260927_multi_store.sql)
+in the Supabase SQL Editor. It preserves existing data under a generated **Default store** and changes transaction keys to include `store_id`.
+
+Upload the newly built worker and Telegram bundles before enabling the schedule again. The old worker is not compatible with the migrated primary keys.
 
 ## 2. Telegram setup
 
@@ -138,8 +148,9 @@ curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" 
 Then test in the bot chat:
 
 - `/status`
-- `/sync`
-- `/sync 2026-09-27`
+- `/stores`
+- `/sync` when there is only one store
+- `/sync <store-id> 2026-09-27` when there are multiple stores
 
 ## 5. Vercel dashboard setup
 
@@ -149,10 +160,15 @@ Add these server-side environment variables to the Vercel project:
 
 - `SUPABASE_URL`
 - `SUPABASE_SECRET_KEY`
-- `REFRESH_TIME=3`
-- `POS_TIME_ZONE=Asia/Jakarta`
+- `REFRESH_TIME=30` (dashboard refresh; AWS can remain at `3`)
+- `SETTINGS_ADMIN_USERNAME`
+- `SETTINGS_ADMIN_PASSWORD` (use a unique, randomly generated password)
 
 The POS and Telegram secrets are not needed in Vercel because those responsibilities run in AWS.
+
+After redeploying Vercel, open `/settings`. The browser will request the settings username and password. Rename the migrated default store or add branches, select either `Asia/Jakarta` (UTC+7) or `Asia/Makassar` (UTC+8), and enter both the initial access token and refresh token. Existing token values are never returned to the browser; blank token fields preserve the saved credentials when editing.
+
+The refresh token is required when a store is created. An expired access token cannot be renewed from the access token alone. After a successful refresh, Lambda replaces both stored tokens with the rotated values returned by the POS API.
 
 ## Local development
 
@@ -170,22 +186,26 @@ Without Supabase variables, the dashboard intentionally renders the supplied sam
 | Variable | Used by | Purpose |
 | --- | --- | --- |
 | `BASE_URL` | AWS worker | POS origin without a trailing slash |
-| `TOKEN` | AWS worker | Initial POS access token; it may be expired |
-| `REFRESH_TOKEN` | AWS worker | Seed refresh token used until a rotated token is stored |
-| `REFRESH_TIME` | AWS and dashboard | Polling and frontend refresh interval in seconds; minimum `3` |
-| `POS_UTC_OFFSET` | AWS worker | POS timestamp offset, default `+07:00` |
-| `POS_TIME_ZONE` | AWS and dashboard | Business timezone, default `Asia/Jakarta` |
+| `TOKEN` | AWS worker | Migration fallback for the default store's initial access token |
+| `REFRESH_TOKEN` | AWS worker | Migration fallback for the default store's initial refresh token |
+| `REFRESH_TIME` | AWS and dashboard | AWS polling or frontend refresh interval; configure separately per service |
+| `POS_UTC_OFFSET` | AWS worker | Legacy default-store fallback; settings now store each branch offset |
+| `POS_TIME_ZONE` | AWS worker | Legacy default-store fallback; settings now store each branch timezone |
 | `SUPABASE_URL` | AWS and Vercel | Supabase project URL |
 | `SUPABASE_SECRET_KEY` | AWS and Vercel server | Private `sb_secret_…` server key |
 | `TELEGRAM_BOT_TOKEN` | Telegram Lambda | BotFather token |
 | `TELEGRAM_WEBHOOK_SECRET` | Telegram Lambda | Validates Telegram’s webhook header |
 | `TELEGRAM_ALLOWED_CHAT_ID` | Telegram Lambda | Only this chat can run commands |
+| `SETTINGS_ADMIN_USERNAME` | Vercel | Username protecting `/settings` and `/api/stores` |
+| `SETTINGS_ADMIN_PASSWORD` | Vercel | Long unique password protecting store and token changes |
 
 ## Cost and timing note
 
 A continuously scheduled 58-second, 128 MB Lambda uses approximately 313,000 GB-seconds in a 30-day month before overhead. That is below AWS Lambda’s standard 400,000 GB-second monthly free allowance if your account is eligible and the allowance is not used elsewhere. Data transfer, logs, Supabase usage, or other AWS resources can still produce charges. Create an AWS Budget alert before leaving the worker enabled.
 
-Three seconds is aggressive for a transaction-report endpoint. Confirm the POS provider permits that request frequency. The design is sequential, so it never starts a second POS request before the previous one completes.
+Three seconds is aggressive for a transaction-report endpoint. Confirm the POS provider permits that request frequency. A store never starts a second request before its previous cycle finishes. Adding stores increases POS and Supabase traffic, although the scheduled Lambda duration remains capped at 58 seconds.
+
+`sync_runs` keeps one row per active store per scheduled Lambda invocation rather than one row per three-second cycle. Successful summaries older than 7 days and failed summaries older than 30 days are removed by the worker's hourly retention pass.
 
 ## Validation
 

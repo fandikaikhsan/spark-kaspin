@@ -7,9 +7,19 @@ export type HourlyItemSale = {
   revenue: number;
 };
 
+export type AnalyticsStore = {
+  id: string;
+  name: string;
+  timeZone: string;
+  utcOffset: string;
+  businessDate: string;
+};
+
 export type DailyAnalytics = {
   date: string;
   source: "supabase" | "demo";
+  store: AnalyticsStore;
+  stores: AnalyticsStore[];
   transactionCount: number;
   totalUnits: number;
   totalRevenue: number;

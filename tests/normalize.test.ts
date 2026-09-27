@@ -23,14 +23,16 @@ describe("POS normalization", () => {
       }],
     };
 
-    const result = normalizeTransactions([transaction], "+07:00");
+    const result = normalizeTransactions([transaction], "store-1", "+07:00");
     expect(result.transactions[0]).toMatchObject({
+      store_id: "store-1",
       transaction_code: "TX-1",
       business_date: "2026-09-27",
       business_hour: 8,
       occurred_at: "2026-09-27T08:14:03+07:00",
     });
     expect(result.items[0]).toMatchObject({
+      store_id: "store-1",
       transaction_code: "TX-1",
       line_number: 0,
       item_code: "CF-1",
