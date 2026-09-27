@@ -1,6 +1,7 @@
 import { refreshIntervalSeconds } from "@/lib/env";
 import { summarizeStore, type Store } from "@/lib/stores";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getRecentTransactions } from "@/lib/transactions";
 import { summarizeHourlyItems } from "./aggregate";
 import type { DailyAnalytics, HourlyItemSale } from "./types";
 
@@ -43,7 +44,7 @@ export async function getDailyAnalytics(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Date must use YYYY-MM-DD");
   const supabase = getSupabaseAdmin();
 
-  const [hourlyRows, transactionsResult, syncResult] = await Promise.all([
+  const [hourlyRows, transactionsResult, syncResult, recentTransactions] = await Promise.all([
     loadAllHourlyRows(store.id, date),
     supabase
       .from("pos_transactions")
@@ -59,6 +60,7 @@ export async function getDailyAnalytics(
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    getRecentTransactions(store, date),
   ]);
 
   if (transactionsResult.error) throw new Error(`Could not count transactions: ${transactionsResult.error.message}`);
@@ -87,5 +89,6 @@ export async function getDailyAnalytics(
     refreshSeconds: refreshIntervalSeconds(),
     lastSyncedAt: syncResult.data?.completed_at || null,
     hourlyItems,
+    recentTransactions,
   };
 }

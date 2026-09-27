@@ -28,6 +28,8 @@ EventBridge itself has one-minute precision. The scheduled Lambda remains active
 - Separate Telegram Lambda with `/stores`, `/sync`, and `/status`
 - Supabase RLS, revoked public grants, and hourly aggregation view
 - Responsive daily metrics and item-by-hour heatmap
+- Live kitchen-ticket receipt rail and paginated transaction history
+- Dashboard login with a bootstrap super-admin and managed admin accounts
 - Demo dashboard data until Supabase is configured
 
 ## 1. Supabase setup
@@ -48,6 +50,10 @@ Temporarily disable the EventBridge schedule, then run
 in the Supabase SQL Editor. It preserves existing data under a generated **Default store** and changes transaction keys to include `store_id`.
 
 Upload the newly built worker and Telegram bundles before enabling the schedule again. The old worker is not compatible with the migrated primary keys.
+
+After the multi-store migration, run
+[`supabase/migrations/20260927_dashboard_auth.sql`](supabase/migrations/20260927_dashboard_auth.sql)
+to add the private managed-user table used by dashboard login.
 
 ## 2. Telegram setup
 
@@ -163,10 +169,11 @@ Add these server-side environment variables to the Vercel project:
 - `REFRESH_TIME=30` (dashboard refresh; AWS can remain at `3`)
 - `SETTINGS_ADMIN_USERNAME`
 - `SETTINGS_ADMIN_PASSWORD` (use a unique, randomly generated password)
+- `AUTH_SESSION_SECRET` (generate with `openssl rand -hex 32`)
 
 The POS and Telegram secrets are not needed in Vercel because those responsibilities run in AWS.
 
-After redeploying Vercel, open `/settings`. The browser will request the settings username and password. Rename the migrated default store or add branches, select either `Asia/Jakarta` (UTC+7) or `Asia/Makassar` (UTC+8), and enter both the initial access token and refresh token. Existing token values are never returned to the browser; blank token fields preserve the saved credentials when editing.
+After redeploying Vercel, open `/login` and sign in with `SETTINGS_ADMIN_USERNAME` and `SETTINGS_ADMIN_PASSWORD`. This environment-backed account is the bootstrap super-admin. Open `/settings` to rename the migrated default store, add branches, or create managed admin accounts. Managed passwords are stored only as salted scrypt hashes. Existing POS token values are never returned to the browser; blank token fields preserve the saved credentials when editing.
 
 The refresh token is required when a store is created. An expired access token cannot be renewed from the access token alone. After a successful refresh, Lambda replaces both stored tokens with the rotated values returned by the POS API.
 
@@ -197,7 +204,8 @@ Without Supabase variables, the dashboard intentionally renders the supplied sam
 | `TELEGRAM_WEBHOOK_SECRET` | Telegram Lambda | Validates Telegram’s webhook header |
 | `TELEGRAM_ALLOWED_CHAT_ID` | Telegram Lambda | Only this chat can run commands |
 | `SETTINGS_ADMIN_USERNAME` | Vercel | Username protecting `/settings` and `/api/stores` |
-| `SETTINGS_ADMIN_PASSWORD` | Vercel | Long unique password protecting store and token changes |
+| `SETTINGS_ADMIN_PASSWORD` | Vercel | Long unique password for the bootstrap super-admin |
+| `AUTH_SESSION_SECRET` | Vercel | Signs 12-hour HTTP-only dashboard sessions |
 
 ## Cost and timing note
 

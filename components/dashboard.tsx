@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { LogoutButton } from "@/components/logout-button";
 import { hottestItem } from "@/lib/analytics/aggregate";
-import type { DailyAnalytics, HourlyItemSale } from "@/lib/analytics/types";
+import type { DailyAnalytics, HourlyItemSale, TransactionReceipt } from "@/lib/analytics/types";
 
 type ItemRow = {
   itemCode: string;
@@ -21,6 +24,57 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
   currency: "IDR",
   maximumFractionDigits: 0,
 });
+
+function receiptTime(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone,
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function ReceiptCard({
+  transaction,
+  timeZone,
+  isNew,
+}: {
+  transaction: TransactionReceipt;
+  timeZone: string;
+  isNew: boolean;
+}) {
+  return (
+    <article className={`receipt-card ${isNew ? "is-new" : ""}`}>
+      <div className="receipt-pin" aria-hidden="true" />
+      {isNew && <span className="new-receipt-label">New order</span>}
+      <div className="receipt-heading">
+        <div>
+          <span>Receipt</span>
+          <strong>#{transaction.receiptNumber}</strong>
+        </div>
+        <time dateTime={transaction.occurredAt}>
+          {receiptTime(transaction.occurredAt, timeZone)}
+        </time>
+      </div>
+      <div className="receipt-rule" />
+      <ul className="receipt-items">
+        {transaction.items.map((item) => (
+          <li key={item.lineNumber}>
+            <span><b>{numberFormatter.format(item.quantity)}×</b> {item.itemName}</span>
+            <strong>{currencyFormatter.format(item.grossSales)}</strong>
+          </li>
+        ))}
+      </ul>
+      <div className="receipt-rule" />
+      <div className="receipt-total">
+        <span>Total</span>
+        <strong>{currencyFormatter.format(transaction.grandTotal)}</strong>
+      </div>
+      <p className="receipt-payment">{transaction.paymentType}</p>
+    </article>
+  );
+}
 
 function buildRows(data: DailyAnalytics): ItemRow[] {
   const byItem = new Map<string, ItemRow>();
@@ -52,6 +106,8 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newReceiptIds, setNewReceiptIds] = useState<Set<string>>(new Set());
+  const receiptRailRef = useRef<HTMLDivElement>(null);
 
   const rows = useMemo(() => buildRows(data), [data]);
   const hottest = useMemo(() => hottestItem(data.hourlyItems), [data.hourlyItems]);
@@ -68,9 +124,19 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not refresh analytics");
-      setData(payload as DailyAnalytics);
+      const nextData = payload as DailyAnalytics;
+      const isSameFeed = nextData.store.id === data.store.id && nextData.date === data.date;
+      const existingIds = new Set(data.recentTransactions.map((transaction) => transaction.transactionCode));
+      const arrivals = isSameFeed
+        ? nextData.recentTransactions
+          .filter((transaction) => !existingIds.has(transaction.transactionCode))
+          .map((transaction) => transaction.transactionCode)
+        : [];
+      setData(nextData);
       setDate(nextDate);
       setSelection(null);
+      setNewReceiptIds(new Set(arrivals));
+      if (arrivals.length) window.setTimeout(() => setNewReceiptIds(new Set()), 4_000);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not refresh analytics");
     } finally {
@@ -88,19 +154,37 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, data.refreshSeconds, data.store.id]);
 
+  useEffect(() => {
+    if (!newReceiptIds.size || !receiptRailRef.current) return;
+    receiptRailRef.current.scrollTo({
+      left: receiptRailRef.current.scrollWidth,
+      behavior: "smooth",
+    });
+  }, [newReceiptIds]);
+
   return (
     <main className="shell">
       <header className="masthead">
-        <div>
-          <p className="eyebrow">Kaspin · POS intelligence</p>
-          <h1>Daily item pulse</h1>
-          <p className="subtitle">{data.store.name} · See what sells, and when demand peaks.</p>
+        <div className="dashboard-brand">
+          <div>
+            <h1>Spark Intelligence</h1>
+          </div>
+          <Image
+            className="sarkop-logo"
+            src="/logo_sarkop_red.png"
+            alt="Sarkop"
+            width={3166}
+            height={1590}
+            priority
+          />
         </div>
         <div className="date-controls">
           <div className="control-labels">
             <label htmlFor="store-select">Store</label>
-            {/* Full navigation allows the browser to present the HTTP Basic Auth prompt. */}
-            <a href="/settings">Store settings</a>
+            <span className="control-links">
+              <Link href="/settings">Settings</Link>
+              <LogoutButton />
+            </span>
           </div>
           <select
             id="store-select"
@@ -164,6 +248,36 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
         </article>
       </section>
 
+      <section className="receipts-section" aria-labelledby="receipts-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Live order rail</p>
+            <h2 id="receipts-title">Recent transactions</h2>
+          </div>
+          <Link
+            className="section-link"
+            href={`/transactions?${new URLSearchParams({ store: data.store.id, date: data.date }).toString()}`}
+          >
+            See all transactions
+          </Link>
+        </div>
+
+        {data.recentTransactions.length ? (
+          <div className="receipt-rail" ref={receiptRailRef} aria-live="polite">
+            {data.recentTransactions.map((transaction) => (
+              <ReceiptCard
+                transaction={transaction}
+                timeZone={data.store.timeZone}
+                isNew={newReceiptIds.has(transaction.transactionCode)}
+                key={transaction.transactionCode}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state receipt-empty">No receipts have arrived for this date yet.</div>
+        )}
+      </section>
+
       <section className="heatmap-section" aria-labelledby="heatmap-title">
         <div className="section-heading">
           <div>
@@ -173,7 +287,9 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
           <p className="sync-copy">
             {data.lastSyncedAt
               ? `Last synced ${new Date(data.lastSyncedAt).toLocaleString()}`
-              : `View refreshes every ${Math.round(data.refreshSeconds / 60)} min`}
+              : data.refreshSeconds < 60
+                ? `View refreshes every ${data.refreshSeconds} sec`
+                : `View refreshes every ${Math.round(data.refreshSeconds / 60)} min`}
           </p>
         </div>
 

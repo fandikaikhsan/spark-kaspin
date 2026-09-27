@@ -2,7 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
+import { UserManagement } from "@/components/user-management";
 import type { StoreAdminSummary } from "@/lib/store-settings";
+import type { ManagedUser } from "@/lib/users";
 
 type StoreFormState = {
   name: string;
@@ -144,19 +147,28 @@ function StoreForm({
   );
 }
 
-export function StoreSettings({ initialStores }: { initialStores: StoreAdminSummary[] }) {
+export function StoreSettings({
+  initialStores,
+  initialUsers,
+}: {
+  initialStores: StoreAdminSummary[];
+  initialUsers: ManagedUser[];
+}) {
   const [stores, setStores] = useState(initialStores);
   return (
     <main className="shell settings-shell">
       <header className="settings-header">
         <div>
-          <p className="eyebrow">Kaspin · Administration</p>
+          <p className="eyebrow">Spark Intelligence · Administration</p>
           <h1>Store settings</h1>
           <p className="subtitle">
             Configure branch timezones and seed credentials. Token values are never displayed again.
           </p>
         </div>
-        <Link className="back-link" href="/">Back to dashboard</Link>
+        <nav className="header-actions" aria-label="Account and navigation">
+          <Link className="back-link" href="/">Back to dashboard</Link>
+          <LogoutButton />
+        </nav>
       </header>
 
       <div className="settings-stack">
@@ -165,6 +177,7 @@ export function StoreSettings({ initialStores }: { initialStores: StoreAdminSumm
         ))}
         <StoreForm onSaved={setStores} />
       </div>
+      <UserManagement initialUsers={initialUsers} />
     </main>
   );
 }

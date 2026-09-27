@@ -42,6 +42,8 @@ create table if not exists public.pos_transactions (
 
 create index if not exists pos_transactions_store_date_idx
   on public.pos_transactions (store_id, business_date, business_hour);
+create index if not exists pos_transactions_store_date_occurred_idx
+  on public.pos_transactions (store_id, business_date, occurred_at desc);
 
 create table if not exists public.pos_transaction_items (
   store_id uuid not null,
@@ -80,6 +82,18 @@ create table if not exists public.sync_runs (
 create index if not exists sync_runs_store_status_completed_idx
   on public.sync_runs (store_id, status, completed_at desc);
 
+create table if not exists public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  username text not null,
+  normalized_username text not null unique,
+  password_hash text not null,
+  role text not null default 'admin' check (role in ('admin')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (normalized_username = lower(normalized_username))
+);
+
 create or replace view public.pos_hourly_item_sales
 with (security_invoker = true) as
 select
@@ -102,6 +116,7 @@ alter table public.integration_credentials enable row level security;
 alter table public.pos_transactions enable row level security;
 alter table public.pos_transaction_items enable row level security;
 alter table public.sync_runs enable row level security;
+alter table public.app_users enable row level security;
 
 -- No public policies are created. The dashboard, settings API, and Lambda
 -- use a server-side Supabase secret key, which bypasses RLS.
@@ -110,4 +125,5 @@ revoke all on table public.integration_credentials from anon, authenticated;
 revoke all on table public.pos_transactions from anon, authenticated;
 revoke all on table public.pos_transaction_items from anon, authenticated;
 revoke all on table public.sync_runs from anon, authenticated;
+revoke all on table public.app_users from anon, authenticated;
 revoke all on table public.pos_hourly_item_sales from anon, authenticated;

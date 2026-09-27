@@ -15,6 +15,38 @@ export type AnalyticsStore = {
   businessDate: string;
 };
 
+export type TransactionItem = {
+  lineNumber: number;
+  itemCode: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  returnedQuantity: number;
+  grossSales: number;
+};
+
+export type TransactionReceipt = {
+  transactionCode: string;
+  receiptNumber: number;
+  businessDate: string;
+  occurredAt: string;
+  subtotal: number;
+  grandTotal: number;
+  paymentType: string;
+  items: TransactionItem[];
+};
+
+export type TransactionPage = {
+  date: string;
+  store: AnalyticsStore;
+  stores: AnalyticsStore[];
+  transactions: TransactionReceipt[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
 export type DailyAnalytics = {
   date: string;
   source: "supabase" | "demo";
@@ -26,4 +58,5 @@ export type DailyAnalytics = {
   refreshSeconds: number;
   lastSyncedAt: string | null;
   hourlyItems: HourlyItemSale[];
+  recentTransactions: TransactionReceipt[];
 };
