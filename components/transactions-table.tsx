@@ -20,6 +20,11 @@ function orderedAt(value: string, timeZone: string) {
   }).format(new Date(value));
 }
 
+function redirectToLogin() {
+  const next = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+}
+
 export function TransactionsTable({ initialData }: { initialData: TransactionPage }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
@@ -38,6 +43,10 @@ export function TransactionsTable({ initialData }: { initialData: TransactionPag
     });
     try {
       const response = await fetch(`/api/transactions?${parameters.toString()}`, { cache: "no-store" });
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not load transactions");
       setData(payload as TransactionPage);
