@@ -166,6 +166,7 @@ export function StoreSettings({
           </p>
         </div>
         <nav className="header-actions" aria-label="Account and navigation">
+          <Link className="back-link" href="/menu-engineering">Menu engineering</Link>
           <Link className="back-link" href="/">Back to dashboard</Link>
           <LogoutButton />
         </nav>

@@ -200,6 +200,7 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
           <div className="control-labels">
             <label htmlFor="store-select">Store</label>
             <span className="control-links">
+              <Link href={`/menu-engineering?store=${data.store.id}`}>Menu engineering</Link>
               <Link href="/settings">Settings</Link>
               <LogoutButton />
             </span>

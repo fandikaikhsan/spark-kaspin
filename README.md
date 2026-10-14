@@ -177,7 +177,45 @@ After redeploying Vercel, open `/login` and sign in with `SETTINGS_ADMIN_USERNAM
 
 The refresh token is required when a store is created. An expired access token cannot be renewed from the access token alone. After a successful refresh, Lambda replaces both stored tokens with the rotated values returned by the POS API.
 
+## Menu engineering
+
+For an existing database, run [`supabase/migrations/20261013_menu_engineering.sql`](supabase/migrations/20261013_menu_engineering.sql) in the Supabase SQL Editor. Fresh installations include these objects in `supabase/schema.sql`. Open **Menu engineering** from the dashboard or visit `/menu-engineering` while signed in as an admin or super-admin.
+
+The catalog is scoped to each store and supports creating, viewing, editing, and deleting raw materials, bases, add-ons, menu items, and variants. Raw materials require a material ID, name, total purchase price, purchase quantity, and UOM; supplier is optional. Bases and add-ons require a name, at least one raw material, and a yield in porsi. Menu items and variants require a name, category, positive suggested selling price, and at least one raw material, base, or add-on; variants also require a main menu item and have their own complete recipe. Categories suggest existing KasirPintar labels without cleaning them. An optional, store-unique POS item code links a menu recipe to ingested transaction items for future usage calculations.
+
+- Raw-material unit cost = purchase price / purchase quantity; compatible mass (kg/g) and volume (l/ml) units convert automatically. Pieces cannot convert to weight or volume. Prepared ingredients use porsi.
+- Base/add-on batch production cost = ingredient subtotal × 1.05; price per portion = batch cost / yield.
+- Menu production cost = sum of ingredient costs, including any prepared ingredient's allowance. Direct raw materials do not receive an additional allowance. Cost percentage = production cost / suggested price × 100. Margin = suggested price − production cost; margin percentage = margin / suggested price × 100.
+
+Costs are calculated from current material prices and yields when the catalog loads; changing either updates dependent recipe costs. No historical cost snapshot is implied. Recipe saves replace item details and ingredients in one database transaction. Referenced ingredients and main menus cannot be deleted; remove their recipe/variant references first. Item types are fixed after creation. API handlers enforce admin access, and the tables and write functions are inaccessible to Supabase anonymous/authenticated clients.
+
+`lib/menu-engineering/model.ts` includes `theoreticalRawUsage`, which expands menu recipes into raw-material quantities using each material's purchase UOM. The 5% production cost allowance does not add physical usage. Actual usage, stock opname, receiving, and delta COGS reporting are future work.
+
 ## Local development
+
+### Local Supabase with a production data snapshot (Windows)
+
+Install Docker Desktop with its WSL 2 backend, complete any required Windows restart, and open Docker Desktop until its Linux engine is running. The project includes the Supabase CLI as a dev dependency. Node.js 20.12+ is required for the local helper scripts.
+
+Add `SUPABASE_PRODUCTION_DB_URL` to the root `.env` using **Supabase Dashboard → Connect → Session pooler** (port 5432). Substitute the actual database password and URL-encode special characters. The existing Supabase API secret is a different credential. Keep the URI in `.env`; the helper does not print credentials or place the password in command arguments.
+
+```powershell
+npm run local:check
+npm run local:source
+npm run local:start
+npm run local:clone
+npm run dev
+```
+
+`local:clone` exports the production `public` schema and all its data in a consistent PostgreSQL archive using a read-only connection. It saves an archive, readable schema, and row-count manifest under the ignored `supabase/backups/` directory, backs up existing local data, and restores into the checked `spark-kaspin-local` Docker container. The restore and menu-engineering migration run in one local transaction. The helper compares every imported table's row count with the archive before generating `.env.local` with the local API URL and service-role key. Root `.env` production values remain intact. Restart an existing Next.js dev server after switching databases.
+
+Local Studio is **http://127.0.0.1:54323**, the API is **http://127.0.0.1:54321**, and PostgreSQL is **127.0.0.1:54322** (database/user/password: `postgres`). Published ports are bound to loopback through a dedicated Docker network. The app uses its existing custom login; production `app_users` and password hashes are included. Supabase-managed Auth/Storage schemas, Storage files, Edge Functions, and cloud project settings are outside this app-data clone.
+
+Production snapshots include private integration credentials and user password hashes. Keep `supabase/backups/` and `.env.local` out of source control. The helper starts database/API/Studio services; it does not start the AWS ingestion workers or Telegram bot.
+
+Use `npm run local:status` to show local URLs, `npm run local:progress` to inspect downloaded images and container startup, `npm run local:stop` to stop services while retaining data, and `npm run local:start` to resume. `npm run local:migrate` reapplies the idempotent menu-engineering migration locally. Running `local:clone` again refreshes local data from production and replaces local edits after backing them up.
+
+Automatic CLI migration replay and seeding are disabled in `supabase/config.toml`: the older SQL files are manual upgrades for an existing schema, with duplicate date versions and no empty-database baseline. Use the helpers above for this workflow. They never link or push to the production project. To return Next.js to the production configuration, remove the two generated Supabase overrides from `.env.local` and restart the dev server.
 
 Copy values from [`.env.example`](.env.example) into `.env`, then run:
 
