@@ -316,3 +316,13 @@ Categories are optional and shared across stores. Select a category or choose **
 Production cost sums raw-material costs and base costs at current reference prices. Base costs already include their 5% allowance; Products adds no second allowance. Cost percentage = cost / selling price × 100. Margin = selling price − cost. Refresh reloads ingredient prices and recipes. Portion-based bases can only be consumed in portions; mass/volume conversions work within their dimensions, and raw materials can also use their defined purchase packs.
 
 Only managers/owners can access Products and Categories or their APIs. New tables use RLS with server service-role access only. Apply `20261022_products.sql` after the Bases migration using `npm.cmd run local:migrate` locally; the helper never pushes production migrations. The previous `/menu-engineering` page now redirects to Products; its legacy tables and APIs are preserved. There are no POS product writes or automatic POS mappings in this change.
+
+### Stock opname
+
+Open **Stock Opname** from the dashboard or catalog navigation (`/stock-opname`). For now it uses the existing manager/owner dashboard login. The selected counter name is independent of that account; a separate employee entry link is deferred.
+
+Select a store, counter and count date. The fixed form contains 6 prep quantities, 22 inventory quantities, and 12 explicit Ya/Tidak restock answers. All 40 answers are required; zero and fractional quantities are accepted, while blank answers are never treated as zero or Tidak. There are no price fields. One save atomically writes `stock_opnames` and its `stock_opname_lines`; retrying the same submission does not create another record. Recent submissions for the selected store can be expanded below the form.
+
+Counts retain the displayed units (Pack, Tray, Karung, etc.). They do not post inventory movements, convert packs to grams, or calculate COGS yet. Prep and restock entries are operational only. Existing Items/Bases are linked by an unambiguous name match when available; incomplete prep catalog data does not block a count. Labels and count units are retained with the submission.
+
+Run `npm.cmd run local:migrate` to install `20261022_stock_opname.sql` after Products in local Supabase. The new tables and submission function allow server service-role access only. `tests/stock-opname-database.sql` provides rollback-only local database checks.

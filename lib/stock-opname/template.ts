@@ -1,0 +1,48 @@
+export const COUNTERS = ["Andi Salsa", "Chandra", "Erel Faizar", "Erlina", "Fathir", "Hanifatun", "Hikma", "Ihza Nataya", "Nabila", "Niatri", "Shalsa Audri", "Vizhal", "Wardana", "Zulkifli"] as const;
+export type CounterName = typeof COUNTERS[number];
+export type StockSection = "prep" | "inventory" | "restock";
+export type StockField = { key: string; section: StockSection; name: string; uom: string | null; note: string; aliases: string[] };
+// One fixed form, shared across stores. No configurable template presets.
+export const STOCK_FIELDS: StockField[] = [
+  {"key":"prep-bayam-krispi","section":"prep","name":"Bayam Krispi","uom":"Box Medium","note":"","aliases":["Bayam Krispi","Base Bayam Krispi"]},
+  {"key":"prep-sambal","section":"prep","name":"Sambal","uom":"Box Kecil","note":"","aliases":["Sambal","Base Sambal","Base Sambel"]},
+  {"key":"prep-ayam-suwir","section":"prep","name":"Ayam Suwir","uom":"Porsi","note":"","aliases":["Ayam Suwir","Prep Ayam Suwir"]},
+  {"key":"prep-base-nasgor","section":"prep","name":"Base Nasgor","uom":"Box Kecil","note":"","aliases":["Base Nasgor","Base Nasi Goreng"]},
+  {"key":"prep-base-carbonara","section":"prep","name":"Base Carbonara","uom":"Box Kecil","note":"","aliases":["Base Carbonara"]},
+  {"key":"prep-ayam-sous-vide","section":"prep","name":"Ayam Sous Vide","uom":"Vacuum Pack","note":"","aliases":["Ayam Sous Vide","Prep Ayam Sous Vide"]},
+  {"key":"beef-shortplate","section":"inventory","name":"Beef Shortplate","uom":"Pack","note":"","aliases":["Beef Shortplate"]},
+  {"key":"dada-ayam-fillet","section":"inventory","name":"Dada Ayam Fillet","uom":"Pack","note":"Untuk Sous Vide","aliases":["Dada Ayam Fillet"]},
+  {"key":"paha-ayam-fillet","section":"inventory","name":"Paha Ayam Fillet","uom":"Pack","note":"Untuk Ayam Suwir","aliases":["Paha Ayam Fillet"]},
+  {"key":"sosis","section":"inventory","name":"Sosis","uom":"Pack","note":"","aliases":["Sosis"]},
+  {"key":"nugget","section":"inventory","name":"Nugget","uom":"Pack","note":"","aliases":["Nugget"]},
+  {"key":"kentang","section":"inventory","name":"Kentang","uom":"Pack","note":"","aliases":["Kentang"]},
+  {"key":"kornet","section":"inventory","name":"Kornet","uom":"Kaleng","note":"","aliases":["Kornet"]},
+  {"key":"roti-kadet","section":"inventory","name":"Roti Kadet","uom":"Pack","note":"","aliases":["Roti Kadet"]},
+  {"key":"beras","section":"inventory","name":"Beras","uom":"Karung","note":"","aliases":["Beras"]},
+  {"key":"telur","section":"inventory","name":"Telur","uom":"Tray","note":"","aliases":["Telur"]},
+  {"key":"minyak-goreng","section":"inventory","name":"Minyak Goreng","uom":"Pack","note":"","aliases":["Minyak Goreng"]},
+  {"key":"kaldu-jamur","section":"inventory","name":"Kaldu Jamur","uom":"Pack","note":"","aliases":["Kaldu Jamur"]},
+  {"key":"lada-hitam","section":"inventory","name":"Lada Hitam","uom":"Pack","note":"","aliases":["Lada Hitam"]},
+  {"key":"bawang-goreng","section":"inventory","name":"Bawang Goreng","uom":"Pack","note":"","aliases":["Bawang Goreng"]},
+  {"key":"saus-tiram","section":"inventory","name":"Saus Tiram","uom":"Pack","note":"","aliases":["Saus Tiram"]},
+  {"key":"saus-teriyaki","section":"inventory","name":"Saus Teriyaki","uom":"Pack","note":"","aliases":["Saus Teriyaki"]},
+  {"key":"kecap-manis","section":"inventory","name":"Kecap Manis","uom":"Pack","note":"","aliases":["Kecap Manis","Kecap"]},
+  {"key":"saus-sambal","section":"inventory","name":"Saus Sambal","uom":"Pack","note":"","aliases":["Saus Sambal"]},
+  {"key":"susu","section":"inventory","name":"Susu","uom":"Pack","note":"","aliases":["Susu","Susu Full Cream"]},
+  {"key":"stevia","section":"inventory","name":"Stevia","uom":"Botol","note":"","aliases":["Stevia"]},
+  {"key":"mi-telur","section":"inventory","name":"Mi Telur","uom":"Pack","note":"","aliases":["Mi Telur","Mie Telur"]},
+  {"key":"chatramue","section":"inventory","name":"Chatramue","uom":"Pack","note":"Thai Tea, untuk Tesu","aliases":["Chatramue","Chatramue Thai Tea"]},
+  {"key":"bawang-merah","section":"restock","name":"Bawang Merah","uom":null,"note":"","aliases":["Bawang Merah"]},
+  {"key":"bawang-putih","section":"restock","name":"Bawang Putih","uom":null,"note":"","aliases":["Bawang Putih"]},
+  {"key":"tomat","section":"restock","name":"Tomat","uom":null,"note":"","aliases":["Tomat"]},
+  {"key":"cabe-besar","section":"restock","name":"Cabe Besar","uom":null,"note":"","aliases":["Cabe Besar"]},
+  {"key":"cabe-rawit","section":"restock","name":"Cabe Rawit","uom":null,"note":"","aliases":["Cabe Rawit","Cabe Rawit Merah"]},
+  {"key":"bayam","section":"restock","name":"Bayam","uom":null,"note":"","aliases":["Bayam"]},
+  {"key":"daun-bawang","section":"restock","name":"Daun Bawang","uom":null,"note":"","aliases":["Daun Bawang"]},
+  {"key":"garam","section":"restock","name":"Garam","uom":null,"note":"","aliases":["Garam"]},
+  {"key":"gula","section":"restock","name":"Gula","uom":null,"note":"","aliases":["Gula"]},
+  {"key":"jinten","section":"restock","name":"Jinten","uom":null,"note":"","aliases":["Jinten"]},
+  {"key":"kencur","section":"restock","name":"Kencur","uom":null,"note":"","aliases":["Kencur"]},
+  {"key":"kemiri","section":"restock","name":"Kemiri","uom":null,"note":"","aliases":["Kemiri"]},
+];
+export const RESTOCK_INSTRUCTION = "Untuk masing-masing barang, perkiraan apakah stocknya cukup sampai H+1 untuk mempertimbangkan pengiriman. Jika akan habis di hari tersebut atau besok, isi \"Ya\"";

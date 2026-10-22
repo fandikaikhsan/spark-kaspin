@@ -202,7 +202,7 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
             <span className="control-links">
               <Link href="/items">Items</Link>
               <Link href="/bases">Bases</Link>
-              <Link href="/products">Products</Link>
+              <Link href="/products">Products</Link><Link href="/stock-opname">Stock Opname</Link>
               <Link href="/settings">Settings</Link>
               <LogoutButton />
             </span>
