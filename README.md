@@ -326,3 +326,13 @@ Select a store, counter and count date. The fixed form contains 6 prep quantitie
 Counts retain the displayed units (Pack, Tray, Karung, etc.). They do not post inventory movements, convert packs to grams, or calculate COGS yet. Prep and restock entries are operational only. Existing Items/Bases are linked by an unambiguous name match when available; incomplete prep catalog data does not block a count. Labels and count units are retained with the submission.
 
 Run `npm.cmd run local:migrate` to install `20261022_stock_opname.sql` after Products in local Supabase. The new tables and submission function allow server service-role access only. `tests/stock-opname-database.sql` provides rollback-only local database checks.
+
+### Receiving
+
+Open **Receiving** (`/receiving`) from the dashboard, Stock Opname, or catalog navigation. It uses the current dashboard manager/owner login and the same employee-name list as Stock Opname. Select the store and receiver, then add 1–100 existing Items with positive quantities. Item search accepts names or IDs. Duplicate items should be combined into one row; fractional quantities are allowed. Each receiving unit is read-only and comes from that item's purchase unit. There are no prices, purchase orders, invoices, or supplier fields.
+
+One save atomically writes `receivings` and `receiving_lines`, with server-recorded receipt time and signed-in submitter. Entry time is treated as receipt time; backdated receiving is deferred. A repeated request with the same submission ID and items returns the saved receipt instead of duplicating it. Recent receipts for the selected store appear in expandable history. History refresh errors do not invalidate a successful save.
+
+The database verifies that every item exists, checks that it has not changed since the form loaded, and snapshots its name and purchase unit definition. Later catalog edits cannot rewrite historical receiving quantities or units. Referenced items/units cannot be deleted. A stale form must be reloaded and quantities/units checked before submitting. The operational catalog projection and receiving history contain no monetary fields.
+
+Receiving does not overwrite stock opname, update an inventory balance, or calculate consumption/COGS yet. Pack-to-count-unit conversion and inventory calculations are deferred. Run `npm.cmd run local:migrate` to install `20261022_receiving.sql` locally after Stock Opname. Tables and submission functions remain restricted to the server service role. `tests/receiving-database.sql` contains rollback-only checks.

@@ -1,5 +1,5 @@
-export const COUNTERS = ["Andi Salsa", "Chandra", "Erel Faizar", "Erlina", "Fathir", "Hanifatun", "Hikma", "Ihza Nataya", "Nabila", "Niatri", "Shalsa Audri", "Vizhal", "Wardana", "Zulkifli"] as const;
-export type CounterName = typeof COUNTERS[number];
+export { EMPLOYEE_NAMES as COUNTERS } from "@/lib/operations/employees";
+export type { EmployeeName as CounterName } from "@/lib/operations/employees";
 export type StockSection = "prep" | "inventory" | "restock";
 export type StockField = { key: string; section: StockSection; name: string; uom: string | null; note: string; aliases: string[] };
 // One fixed form, shared across stores. No configurable template presets.

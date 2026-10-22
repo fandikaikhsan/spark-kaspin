@@ -70,7 +70,7 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
 
   return <main className={`shell ${styles.shell}`}>
     <header className={`subpage-header ${styles.header}`}><div><p className="eyebrow">Spark Intelligence · Operasional</p><h1>Stock opname</h1><p className="subtitle">Hitung stok, isi jumlah, lalu simpan.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><LogoutButton /></nav>
+      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/receiving">Receiving</Link><LogoutButton /></nav>
     </header>
     {!stores.length && <p className="error" role="alert">Tidak ada toko aktif. Periksa koneksi database dan pengaturan toko, lalu muat ulang halaman.</p>}
     <form onSubmit={(event) => void submit(event)} aria-label="Form stock opname" className={styles.form}>
