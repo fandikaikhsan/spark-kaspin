@@ -177,9 +177,9 @@ After redeploying Vercel, open `/login` and sign in with `SETTINGS_ADMIN_USERNAM
 
 The refresh token is required when a store is created. An expired access token cannot be renewed from the access token alone. After a successful refresh, Lambda replaces both stored tokens with the rotated values returned by the POS API.
 
-## Menu engineering
+## Legacy menu-engineering prototype
 
-For an existing database, run [`supabase/migrations/20261013_menu_engineering.sql`](supabase/migrations/20261013_menu_engineering.sql) in the Supabase SQL Editor. Fresh installations include these objects in `supabase/schema.sql`. Open **Menu engineering** from the dashboard or visit `/menu-engineering` while signed in as an admin or super-admin.
+The current catalog uses `/items`, `/bases`, and `/products`, described below. `/menu-engineering` redirects to Products. The following describes the preserved earlier prototype (`20261013_menu_engineering.sql`); its store-scoped tables and APIs are retained for existing data, while new entries use the shared catalog.
 
 The catalog is scoped to each store and supports creating, viewing, editing, and deleting raw materials, bases, add-ons, menu items, and variants. Raw materials require a material ID, name, total purchase price, purchase quantity, and UOM; supplier is optional. Bases and add-ons require a name, at least one raw material, and a yield in porsi. Menu items and variants require a name, category, positive suggested selling price, and at least one raw material, base, or add-on; variants also require a main menu item and have their own complete recipe. Categories suggest existing KasirPintar labels without cleaning them. An optional, store-unique POS item code links a menu recipe to ingested transaction items for future usage calculations.
 
@@ -213,7 +213,7 @@ Local Studio is **http://127.0.0.1:54323**, the API is **http://127.0.0.1:54321*
 
 Production snapshots include private integration credentials and user password hashes. Keep `supabase/backups/` and `.env.local` out of source control. The helper starts database/API/Studio services; it does not start the AWS ingestion workers or Telegram bot.
 
-Use `npm run local:status` to show local URLs, `npm run local:progress` to inspect downloaded images and container startup, `npm run local:stop` to stop services while retaining data, and `npm run local:start` to resume. `npm run local:migrate` reapplies the idempotent menu-engineering and Items migrations locally. Running `local:clone` again refreshes local data from production and replaces local edits after backing them up.
+Use `npm run local:status` to show local URLs, `npm run local:progress` to inspect downloaded images and container startup, `npm run local:stop` to stop services while retaining data, and `npm run local:start` to resume. `npm run local:migrate` reapplies the idempotent catalog and recipe migrations locally. Running `local:clone` again refreshes local data from production and replaces local edits after backing them up.
 
 ### Items: global purchased-stock catalog
 
@@ -301,8 +301,18 @@ Items can use an optional unique ID (up to 80 letters, numbers, dots, hyphens, o
 
 ### Bases and current recipes
 
-Open `/bases` from Items, the dashboard, or Menu Engineering. Manager/owner access matches Items; employee roles are denied on the page and all APIs. Bases are global across stores. Name, base unit, positive batch yield, and at least one raw-material ingredient are required; the ID is optional and fixed after creation. Portions (`porsi`) are the default output unit; g/kg/ml/l/pcs are also supported. Changing the output unit does not automatically convert a yield. Portion-to-weight conversions are not part of this MVP.
+Open `/bases` from Items, Products, or the dashboard. Manager/owner access matches Items; employee roles are denied on the page and all APIs. Bases are global across stores. Name, base unit, positive batch yield, and at least one raw-material ingredient are required; the ID is optional and fixed after creation. Portions (`porsi`) are the default output unit; g/kg/ml/l/pcs are also supported. Changing the output unit does not automatically convert a yield. Portion-to-weight conversions are not part of this MVP.
 
 One form atomically saves `bases`, its one current `recipes` row, and `recipe_ingredients`. Recipes use the new Items catalog only (no nested bases or historical recipe versions). Ingredient units can use compatible standard units or that item's purchase pack. Costing uses current reference prices and conversions, adds 5% production allowance, and divides by batch yield. Refresh picks up changes made in Items. Base identity, yield and ingredient rows can be edited together; deletion removes its recipe and lines, while future restrictive references block deletion. Items used by recipes cannot be deleted, and changes to item units must keep existing recipes valid.
 
-Run `npm.cmd run local:migrate` to apply `20261022_bases.sql` after the Items migrations. The local helper never applies changes to production. Existing menu-engineering prototype records are preserved; new raw-material/base entry routes to Items/Bases. Product recipe replacement will be handled in the Products stage.
+Run `npm.cmd run local:migrate` to apply `20261022_bases.sql` after the Items migrations. The local helper never applies changes to production. Existing menu-engineering prototype records are preserved; new raw-material/base entry routes to Items/Bases. Product recipes now use the shared recipe tables through `/products`.
+
+### Products and categories
+
+Open `/products` for Menu, Variant and Add-on products. One form saves a product and its current recipe together; recipes require 1–200 ingredients from Items and/or Bases and produce one sold unit. Variants reference a main Menu product and retain their own complete recipe and selling price. Main menus used by variants cannot be deleted or changed into another type. Optional IDs follow the Items/Bases convention and stay fixed after creation. A zero selling price is supported; percentage metrics are undefined and displayed as a dash.
+
+Categories are optional and shared across stores. Select a category or choose **+ Create category** within the product form. Creation trims names and reuses an existing category when only capitalization differs. There is no separate Categories page or category hierarchy in this MVP.
+
+Production cost sums raw-material costs and base costs at current reference prices. Base costs already include their 5% allowance; Products adds no second allowance. Cost percentage = cost / selling price × 100. Margin = selling price − cost. Refresh reloads ingredient prices and recipes. Portion-based bases can only be consumed in portions; mass/volume conversions work within their dimensions, and raw materials can also use their defined purchase packs.
+
+Only managers/owners can access Products and Categories or their APIs. New tables use RLS with server service-role access only. Apply `20261022_products.sql` after the Bases migration using `npm.cmd run local:migrate` locally; the helper never pushes production migrations. The previous `/menu-engineering` page now redirects to Products; its legacy tables and APIs are preserved. There are no POS product writes or automatic POS mappings in this change.

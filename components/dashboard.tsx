@@ -202,7 +202,7 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
             <span className="control-links">
               <Link href="/items">Items</Link>
               <Link href="/bases">Bases</Link>
-              <Link href={`/menu-engineering?store=${data.store.id}`}>Menu engineering</Link>
+              <Link href="/products">Products</Link>
               <Link href="/settings">Settings</Link>
               <LogoutButton />
             </span>
