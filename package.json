@@ -16,6 +16,7 @@
     "local:progress": "node scripts/local-supabase.mjs progress",
     "local:clone": "node scripts/local-supabase.mjs clone",
     "local:migrate": "node scripts/local-supabase.mjs migrate",
+    "local:sync": "node scripts/local-sync.mjs",
     "aws:build": "sam build",
     "aws:validate": "sam validate --lint"
   },

@@ -213,9 +213,41 @@ Local Studio is **http://127.0.0.1:54323**, the API is **http://127.0.0.1:54321*
 
 Production snapshots include private integration credentials and user password hashes. Keep `supabase/backups/` and `.env.local` out of source control. The helper starts database/API/Studio services; it does not start the AWS ingestion workers or Telegram bot.
 
-Use `npm run local:status` to show local URLs, `npm run local:progress` to inspect downloaded images and container startup, `npm run local:stop` to stop services while retaining data, and `npm run local:start` to resume. `npm run local:migrate` reapplies the idempotent menu-engineering migration locally. Running `local:clone` again refreshes local data from production and replaces local edits after backing them up.
+Use `npm run local:status` to show local URLs, `npm run local:progress` to inspect downloaded images and container startup, `npm run local:stop` to stop services while retaining data, and `npm run local:start` to resume. `npm run local:migrate` reapplies the idempotent menu-engineering and Items migrations locally. Running `local:clone` again refreshes local data from production and replaces local edits after backing them up.
+
+### Items: global purchased-stock catalog
+
+Open `/items` using the **Items** navigation link. Access to the page and every read/write API is restricted to the existing `admin` (manager) and `super_admin` (owner) roles. Employee/staff roles are not allowed. Do not assign employee accounts the `admin` role.
+
+The single item form saves both the item and its purchase unit. Enter a name, base unit (`g`, `kg`, `ml`, `l`, or `pcs`), purchase-unit name, number of base units in one purchase unit, purchase quantity, and total reference purchase price. For example, two 1,000 g bags at Rp30,000 total represent 2,000 g at Rp15/g. Standard mass/volume/count conversions are automatic; pack sizes are explicit. Blank IDs and update timestamps are generated automatically. The list supports name/ID search, refresh, create, edit, and confirmed deletion.
+
+`public.items` and `public.units` are global, without `store_id`. The database saves them atomically, prevents cross-item purchase-unit references, validates standard conversions, and uses RLS with access granted only to the server service role. Future recipe/count/receipt references should use restrictive foreign keys so referenced stock cannot be deleted. This new catalog is separate from the earlier store-scoped menu-engineering prototype; it does not yet change those existing recipes.
+
+For local setup, run `npm.cmd run local:migrate` and restart the dashboard if needed. This applies the Items migrations (`20261022_items.sql` and `20261022_item_details.sql`) along with the earlier menu-engineering migration without cloning data. A future production release must apply the Items migration to the production database before using the page there; the local helper never applies it to production.
 
 Automatic CLI migration replay and seeding are disabled in `supabase/config.toml`: the older SQL files are manual upgrades for an existing schema, with duplicate date versions and no empty-database baseline. Use the helpers above for this workflow. They never link or push to the production project. To return Next.js to the production configuration, remove the two generated Supabase overrides from `.env.local` and restart the dev server.
+
+### Live production transactions in the local dashboard
+
+With Docker Desktop and local Supabase running, fetch the full production transaction history once:
+
+```powershell
+npm.cmd run local:sync
+```
+
+To keep transactions updated, run this in a separate terminal alongside `npm.cmd run dev`:
+
+```powershell
+npm.cmd run local:sync -- --watch
+```
+
+Watch mode refreshes every 30 seconds; use `--watch --interval 60` to change the interval (minimum 10 seconds). Press **Ctrl+C** to stop. The dashboard's normal refresh picks up the mirrored data. Postman can remain closed.
+
+This uses the `SUPABASE_PRODUCTION_DB_URL` in root `.env` through a read-only PostgreSQL connection and writes only to the verified local Docker database. Each export is a consistent source snapshot, and each local update commits in one transaction. The first cycle backfills all sales; later cycles fetch new transactions and re-read today/yesterday in each store's timezone to capture receipt edits and refunds. Every 15 minutes, a full reconciliation also captures older edits and source deletions. Transaction lines are replaced for each affected receipt, including removed lines.
+
+Production is authoritative for the local `pos_transactions` and `pos_transaction_items` tables. Existing local recipes, POS credentials, users, branch settings, and other sync history are retained; missing source branches are added without changing the local default branch. Mirror audit summaries retain production's actual successful-sync timestamp. No POS requests or token refreshes are performed locally, so the production worker remains the sole POS ingestion path. Do not run `local:clone` while watch mode is running; cloning replaces the local database, whereas `local:sync` refreshes sales only.
+
+The latest private snapshot and sync summary are saved under ignored `supabase/backups/live-transactions/`. Only one mirror can run at a time. A failed export or local transaction leaves the last successfully mirrored data available; watch mode retries on the next interval.
 
 Copy values from [`.env.example`](.env.example) into `.env`, then run:
 
@@ -264,3 +296,5 @@ pnpm aws:build     # requires AWS SAM CLI
 ```
 
 The source `api.json`, `.env`, `.aws-sam`, and `samconfig.toml` are excluded from source control because they can contain operational data or secrets.
+
+Items can use an optional unique ID (up to 80 letters, numbers, dots, hyphens, or underscores); blank IDs are generated. IDs remain fixed after creation. Optional Supplier notes are free text (up to 1,000 characters), editable in the same form and shown in the catalog.

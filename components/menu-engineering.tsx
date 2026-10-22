@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import {
@@ -77,7 +78,8 @@ function ItemForm({ existing, items, categories, storeId, onSaved, onCancel }: {
   existing?: EngineeringItem; items: EngineeringItem[]; categories: string[]; storeId: string;
   onSaved(): Promise<void>; onCancel(): void;
 }) {
-  const [item, setItem] = useState<ItemInput>(existing || freshItem("raw_material"));
+  const router = useRouter();
+  const [item, setItem] = useState<ItemInput>(existing || freshItem("base"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const categoryId = useId();
@@ -108,11 +110,14 @@ function ItemForm({ existing, items, categories, storeId, onSaved, onCancel }: {
     finally { setSaving(false); }
   }
   return <form className="engineering-editor" onSubmit={submit}>
-    <div className="engineering-section-heading"><div><p className="eyebrow">{existing ? "Edit catalog" : "Data entry"}</p><h2>{existing ? existing.name : "Create an item"}</h2></div>
+    <div className="engineering-section-heading"><div><p className="eyebrow">{existing ? "Edit catalog" : "Recipe entry"}</p><h2>{existing ? existing.name : "Create a recipe"}</h2></div>
       <button type="button" className="engineering-secondary" onClick={onCancel} disabled={saving}>Close</button></div>
     <fieldset disabled={saving}>
       <div className="engineering-fields">
-        <label><span>Item type *</span><select value={raw ? "raw_material" : prep ? "base" : "menu_item"} disabled={Boolean(existing)} onChange={(event) => { setItem(freshItem(event.target.value as ItemType)); setError(null); }}>
+        <label><span>Item type *</span><select value={raw ? "raw_material" : prep ? "base" : "menu_item"} disabled={Boolean(existing)} onChange={(event) => {
+          if (event.target.value === "raw_material") { router.push("/items?create=1"); return; }
+          setItem(freshItem(event.target.value as ItemType)); setError(null);
+        }}>
           <option value="raw_material">Raw material</option><option value="base">Base / add-on</option><option value="menu_item">Menu item / variant</option>
         </select></label>
         {!raw && <label><span>{prep ? "Preparation type" : "Is this a variant?"}</span><select value={item.type} disabled={Boolean(existing)} onChange={(event) => setItem(freshItem(event.target.value as ItemType))}>
@@ -162,7 +167,7 @@ function ItemForm({ existing, items, categories, storeId, onSaved, onCancel }: {
       {menu && <p className="engineering-hint">Margin = suggested price − production cost. Each variant has its own complete recipe and price.</p>}
       {raw && <p className="engineering-hint">Purchase price is the total price for the entered quantity. Recipes convert compatible units automatically.</p>}
       {error && <div className="error" role="alert">{error}</div>}
-      <div className="engineering-form-actions"><span>* Required fields</span><button className="engineering-primary" type="submit" disabled={saving || (!raw && !candidates.length) || (item.type === "variant" && !parents.length)}>{saving ? "Saving…" : existing ? "Save changes" : "Create item"}</button></div>
+      <div className="engineering-form-actions"><span>* Required fields</span><button className="engineering-primary" type="submit" disabled={saving || (!raw && !candidates.length) || (item.type === "variant" && !parents.length)}>{saving ? "Saving…" : existing ? "Save changes" : "Create recipe"}</button></div>
     </fieldset>
   </form>;
 }
@@ -211,13 +216,13 @@ export function MenuEngineering({ stores, initialCatalog, initialError, initialS
   const visible = catalog.items.filter((item) => (filter === "all" || filter === item.type) && `${item.name} ${item.code} ${item.category || ""} ${item.supplier || ""}`.toLowerCase().includes(search.toLowerCase()));
   return <main className="shell engineering-shell">
     <header className="subpage-header"><div><p className="eyebrow">Spark Intelligence · Administration</p><h1>Menu engineering</h1><p className="subtitle">Build the ingredients and recipes behind your menu costs.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
+      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
     {!stores.length ? <div className="notice">Add a store in <Link href="/settings">Settings</Link> before creating a catalog.</div> : <>
       <section className="engineering-toolbar" aria-label="Catalog controls"><label><span>Store</span><select value={storeId} disabled={editor !== null || busyDelete} onChange={(event) => {
         const next = event.target.value; setStoreId(next); setCatalog({ items: [], categories: [] }); setDeleting(null); setMessage(null);
         window.history.replaceState(null, "", `/menu-engineering?store=${encodeURIComponent(next)}`); void refresh(next);
       }}>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}{store.active ? "" : " (inactive)"}</option>)}</select></label>
-        <div className="engineering-toolbar-actions"><button type="button" className="engineering-secondary" disabled={loading || editor !== null || busyDelete} onClick={() => void refresh()}>Refresh</button><button type="button" className="engineering-primary" disabled={loading || catalogUnavailable || busyDelete || editor !== null} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>+ Create item</button></div></section>
+        <div className="engineering-toolbar-actions"><Link className="engineering-secondary engineering-action-link" href="/items?create=1">+ Create item</Link><button type="button" className="engineering-secondary" disabled={loading || editor !== null || busyDelete} onClick={() => void refresh()}>Refresh</button><button type="button" className="engineering-primary" disabled={loading || catalogUnavailable || busyDelete || editor !== null} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>+ Create recipe</button></div></section>
       <div className="engineering-summary">{[
         { label: "Raw materials", count: catalog.items.filter((item) => item.type === "raw_material").length },
         { label: "Bases & add-ons", count: catalog.items.filter((item) => isPreparation(item.type)).length },
@@ -227,7 +232,7 @@ export function MenuEngineering({ stores, initialCatalog, initialError, initialS
       {message && <div className="notice" role="status">{message}</div>}
       {loading && <p role="status">Loading catalog…</p>}
       {editor !== null && <ItemForm key={editor === "new" ? "new" : editor.id} existing={editor === "new" ? undefined : editor} items={catalog.items} categories={catalog.categories} storeId={storeId} onCancel={() => setEditor(null)} onSaved={async () => {
-        setEditor(null); setMessage(editor === "new" ? "Item created." : "Item updated. Dependent recipe costs have been recalculated."); await refresh();
+        setEditor(null); setMessage(editor === "new" ? "Recipe created." : "Item updated. Dependent recipe costs have been recalculated."); await refresh();
       }} />}
       <section className="engineering-catalog" aria-label="Item catalog" aria-busy={loading}>
         <div className="engineering-section-heading"><div><h2>Item catalog</h2><p>{visible.length} of {catalog.items.length} items</p></div><label className="engineering-search"><span className="sr-only">Search catalog</span><input type="search" placeholder="Search name, ID, category…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
