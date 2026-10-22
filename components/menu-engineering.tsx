@@ -79,7 +79,7 @@ function ItemForm({ existing, items, categories, storeId, onSaved, onCancel }: {
   onSaved(): Promise<void>; onCancel(): void;
 }) {
   const router = useRouter();
-  const [item, setItem] = useState<ItemInput>(existing || freshItem("base"));
+  const [item, setItem] = useState<ItemInput>(existing || freshItem("menu_item"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const categoryId = useId();
@@ -116,6 +116,7 @@ function ItemForm({ existing, items, categories, storeId, onSaved, onCancel }: {
       <div className="engineering-fields">
         <label><span>Item type *</span><select value={raw ? "raw_material" : prep ? "base" : "menu_item"} disabled={Boolean(existing)} onChange={(event) => {
           if (event.target.value === "raw_material") { router.push("/items?create=1"); return; }
+          if (event.target.value === "base") { router.push("/bases?create=1"); return; }
           setItem(freshItem(event.target.value as ItemType)); setError(null);
         }}>
           <option value="raw_material">Raw material</option><option value="base">Base / add-on</option><option value="menu_item">Menu item / variant</option>
@@ -216,13 +217,13 @@ export function MenuEngineering({ stores, initialCatalog, initialError, initialS
   const visible = catalog.items.filter((item) => (filter === "all" || filter === item.type) && `${item.name} ${item.code} ${item.category || ""} ${item.supplier || ""}`.toLowerCase().includes(search.toLowerCase()));
   return <main className="shell engineering-shell">
     <header className="subpage-header"><div><p className="eyebrow">Spark Intelligence · Administration</p><h1>Menu engineering</h1><p className="subtitle">Build the ingredients and recipes behind your menu costs.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
+      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
     {!stores.length ? <div className="notice">Add a store in <Link href="/settings">Settings</Link> before creating a catalog.</div> : <>
       <section className="engineering-toolbar" aria-label="Catalog controls"><label><span>Store</span><select value={storeId} disabled={editor !== null || busyDelete} onChange={(event) => {
         const next = event.target.value; setStoreId(next); setCatalog({ items: [], categories: [] }); setDeleting(null); setMessage(null);
         window.history.replaceState(null, "", `/menu-engineering?store=${encodeURIComponent(next)}`); void refresh(next);
       }}>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}{store.active ? "" : " (inactive)"}</option>)}</select></label>
-        <div className="engineering-toolbar-actions"><Link className="engineering-secondary engineering-action-link" href="/items?create=1">+ Create item</Link><button type="button" className="engineering-secondary" disabled={loading || editor !== null || busyDelete} onClick={() => void refresh()}>Refresh</button><button type="button" className="engineering-primary" disabled={loading || catalogUnavailable || busyDelete || editor !== null} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>+ Create recipe</button></div></section>
+        <div className="engineering-toolbar-actions"><Link className="engineering-secondary engineering-action-link" href="/items?create=1">+ Create item</Link><Link className="engineering-secondary engineering-action-link" href="/bases?create=1">+ Create base</Link><button type="button" className="engineering-secondary" disabled={loading || editor !== null || busyDelete} onClick={() => void refresh()}>Refresh</button><button type="button" className="engineering-primary" disabled={loading || catalogUnavailable || busyDelete || editor !== null} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>+ Create recipe</button></div></section>
       <div className="engineering-summary">{[
         { label: "Raw materials", count: catalog.items.filter((item) => item.type === "raw_material").length },
         { label: "Bases & add-ons", count: catalog.items.filter((item) => isPreparation(item.type)).length },

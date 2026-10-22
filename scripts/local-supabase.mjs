@@ -15,7 +15,7 @@ const container = `supabase_db_${project}`;
 const network = `${project}-loopback`;
 const backups = path.join(root, "supabase", "backups");
 const cli = path.join(root, "node_modules", "supabase", "dist", "supabase.js");
-const migrations = ["20261013_menu_engineering.sql", "20261022_items.sql", "20261022_item_details.sql"]
+const migrations = ["20261013_menu_engineering.sql", "20261022_items.sql", "20261022_item_details.sql", "20261022_bases.sql"]
   .map((file) => path.join(root, "supabase", "migrations", file));
 const dockerCandidates = [
   process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "DockerDesktop", "resources", "bin", "docker.exe"),
@@ -200,7 +200,7 @@ async function migrate() {
   await writeFile(patch, await applicationMigrations() + privateGrants);
   await copyToContainer(patch, "/tmp/spark-local-migration.sql");
   await execDatabase(["psql", "--no-psqlrc", "--quiet", "--single-transaction", "--set", "ON_ERROR_STOP=1", "--file", "/tmp/spark-local-migration.sql"], { label: "Apply local menu engineering migration" });
-  console.log("Menu engineering and Items migrations applied to the local database.");
+  console.log("Catalog and recipe migrations applied to the local database.");
 }
 async function main() {
   switch (process.argv[2]) {

@@ -298,3 +298,11 @@ pnpm aws:build     # requires AWS SAM CLI
 The source `api.json`, `.env`, `.aws-sam`, and `samconfig.toml` are excluded from source control because they can contain operational data or secrets.
 
 Items can use an optional unique ID (up to 80 letters, numbers, dots, hyphens, or underscores); blank IDs are generated. IDs remain fixed after creation. Optional Supplier notes are free text (up to 1,000 characters), editable in the same form and shown in the catalog.
+
+### Bases and current recipes
+
+Open `/bases` from Items, the dashboard, or Menu Engineering. Manager/owner access matches Items; employee roles are denied on the page and all APIs. Bases are global across stores. Name, base unit, positive batch yield, and at least one raw-material ingredient are required; the ID is optional and fixed after creation. Portions (`porsi`) are the default output unit; g/kg/ml/l/pcs are also supported. Changing the output unit does not automatically convert a yield. Portion-to-weight conversions are not part of this MVP.
+
+One form atomically saves `bases`, its one current `recipes` row, and `recipe_ingredients`. Recipes use the new Items catalog only (no nested bases or historical recipe versions). Ingredient units can use compatible standard units or that item's purchase pack. Costing uses current reference prices and conversions, adds 5% production allowance, and divides by batch yield. Refresh picks up changes made in Items. Base identity, yield and ingredient rows can be edited together; deletion removes its recipe and lines, while future restrictive references block deletion. Items used by recipes cannot be deleted, and changes to item units must keep existing recipes valid.
+
+Run `npm.cmd run local:migrate` to apply `20261022_bases.sql` after the Items migrations. The local helper never applies changes to production. Existing menu-engineering prototype records are preserved; new raw-material/base entry routes to Items/Bases. Product recipe replacement will be handled in the Products stage.

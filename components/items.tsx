@@ -154,7 +154,7 @@ export function Items({ initialItems, initialError, startCreating = false }: { i
   const disabled = loading || mutating || editor !== null || !available;
   return <main className={`shell engineering-shell ${styles.shell}`}>
     <header className="subpage-header"><div><p className="eyebrow">Spark Intelligence · Inventory</p><h1>Items</h1><p className="subtitle">Purchased stock and raw materials, shared across all stores.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/menu-engineering">Menu engineering</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
+      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/menu-engineering">Menu engineering</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
     {error && <div className="error" role="alert">{error}</div>}
     {message && <div className="notice" role="status">{message}</div>}
     <div className="engineering-toolbar"><label><span>Search items</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or ID" /></label>

@@ -3,8 +3,14 @@ begin;
 alter table public.items drop constraint if exists items_purchase_unit_fk;
 alter table public.units drop constraint if exists units_item_id_fkey;
 alter table public.items alter column id drop default;
-alter table public.items alter column id type text using id::text;
-alter table public.units alter column item_id type text using item_id::text;
+do $$ begin
+  if (select data_type from information_schema.columns where table_schema = 'public' and table_name = 'items' and column_name = 'id') <> 'text' then
+    alter table public.items alter column id type text using id::text;
+  end if;
+  if (select data_type from information_schema.columns where table_schema = 'public' and table_name = 'units' and column_name = 'item_id') <> 'text' then
+    alter table public.units alter column item_id type text using item_id::text;
+  end if;
+end $$;
 alter table public.items alter column id set default gen_random_uuid()::text;
 alter table public.items add column if not exists supplier text;
 alter table public.items drop constraint if exists items_id_format;
