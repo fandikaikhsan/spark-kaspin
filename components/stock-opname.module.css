@@ -4,7 +4,8 @@
 .header :global(.subtitle) { margin-top: 10px; font-size: .9rem; }
 .header nav { flex-wrap: wrap; gap: 15px; }
 .fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
-.meta { display: grid; grid-template-columns: 1fr 1fr .8fr; gap: 16px; padding: 18px 20px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--green); border-radius: 12px; }
+.meta { display: grid; grid-template-columns: 1fr 1fr .8fr 1fr; gap: 16px; padding: 18px 20px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--green); border-radius: 12px; }
+.meta small { font-size: .65rem; line-height:1.4; color:var(--muted); }
 .meta label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .meta label > span { font-size: .76rem; font-weight: 650; }
 .meta :is(input,select) { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); font-size: .85rem; }

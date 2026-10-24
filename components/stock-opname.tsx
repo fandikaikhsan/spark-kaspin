@@ -28,6 +28,7 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
 }) {
   const [storeId, setStoreId] = useState(stores[0]?.id || "");
   const [countDate, setCountDate] = useState(initialDate);
+  const [countTime, setCountTime] = useState("");
   const [countedBy, setCountedBy] = useState("");
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -57,7 +58,9 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
     try {
       const values = Object.fromEntries(STOCK_FIELDS.map((field) => [field.key, field.section === "restock" ? answers[field.key] : typeof answers[field.key] === "string" && String(answers[field.key]).trim() !== "" ? Number(answers[field.key]) : null]));
       token.current ??= crypto.randomUUID();
-      const input = parseStockOpname({ id: token.current, storeId, countDate, countedBy, answers: values });
+      const store = stores.find((store) => store.id === storeId);
+      if (!countTime || !store) throw new Error("Isi jam saat stok dihitung");
+      const input = parseStockOpname({ id: token.current, storeId, countDate, countedAt: `${countDate}T${countTime}:00${store.utcOffset}`, countedBy, answers: values });
       inFlight.current = true; setBusy(true);
       const response = await fetch("/api/stock-opname", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
       if (!response.ok) throw new Error(await responseError(response));
@@ -66,7 +69,7 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
     } catch (error) { setError(error instanceof Error ? error.message : "Stock opname gagal disimpan"); }
     finally { inFlight.current = false; setBusy(false); }
   }
-  function reset() { setAnswers({}); setCountedBy(""); setCountDate(today(stores.find((store) => store.id === storeId))); token.current = null; setSavedId(null); setError(null); }
+  function reset() { setAnswers({}); setCountedBy(""); setCountTime(""); setCountDate(today(stores.find((store) => store.id === storeId))); token.current = null; setSavedId(null); setError(null); }
 
   return <main className={`shell ${styles.shell}`}>
     <header className={`subpage-header ${styles.header}`}><div><p className="eyebrow">Spark Intelligence · Operasional</p><h1>Stock opname</h1><p className="subtitle">Hitung stok, isi jumlah, lalu simpan.</p></div>
@@ -79,6 +82,7 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
           <label><span>Toko *</span><select required value={storeId} onChange={(event) => { const id = event.target.value; setStoreId(id); setCountDate(today(stores.find((store) => store.id === id))); setSubmissions([]); void refreshHistory(id); }}><option value="" disabled>Pilih toko</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
           <label><span>Nama *</span><select required value={countedBy} onChange={(event) => setCountedBy(event.target.value)}><option value="" disabled>Siapa yang menghitung?</option>{COUNTERS.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
           <label><span>Tanggal *</span><input type="date" required min="0001-01-01" max="9999-12-31" value={countDate} onChange={(event) => setCountDate(event.target.value)} /></label>
+          <label><span>Jam stok dihitung * ({stores.find((store) => store.id === storeId)?.timeZone === "Asia/Makassar" ? "WITA" : "WIB"})</span><input type="time" required value={countTime} onChange={(event) => setCountTime(event.target.value)} /><small>Waktu stok selesai dihitung, bukan waktu formulir dikirim.</small></label>
         </div>
         <div className={styles.sections}>{sections.map((section, sectionIndex) => <section key={section.key} className={`${styles.section} ${styles[section.key]}`} aria-labelledby={`${section.key}-heading`}>
           <div className={styles.sectionHeading}><span className={styles.number}>{String(sectionIndex + 1).padStart(2, "0")}</span><div><h2 id={`${section.key}-heading`}>{section.title}</h2><p>{section.hint}</p></div></div>

@@ -15,7 +15,7 @@ const container = `supabase_db_${project}`;
 const network = `${project}-loopback`;
 const backups = path.join(root, "supabase", "backups");
 const cli = path.join(root, "node_modules", "supabase", "dist", "supabase.js");
-const migrations = ["20261013_menu_engineering.sql", "20261022_items.sql", "20261022_item_details.sql", "20261022_bases.sql", "20261022_products.sql", "20261022_stock_opname.sql", "20261022_receiving.sql", "20261024_product_yields_receiving_units.sql"]
+const migrations = ["20261013_menu_engineering.sql", "20261022_items.sql", "20261022_item_details.sql", "20261022_bases.sql", "20261022_products.sql", "20261022_stock_opname.sql", "20261022_receiving.sql", "20261024_product_yields_receiving_units.sql", "20261024_cogs_quantity_engine.sql"]
   .map((file) => path.join(root, "supabase", "migrations", file));
 const dockerCandidates = [
   process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "DockerDesktop", "resources", "bin", "docker.exe"),
