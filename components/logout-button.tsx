@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
-export function LogoutButton() {
+export function LogoutButton({ className = "text-button", children, ariaLabel }: { className?: string; children?: ReactNode; ariaLabel?: string } = {}) {
   const [loading, setLoading] = useState(false);
 
   async function logout() {
@@ -15,8 +15,8 @@ export function LogoutButton() {
   }
 
   return (
-    <button className="text-button" type="button" onClick={logout} disabled={loading}>
-      {loading ? "Signing out…" : "Sign out"}
+    <button className={className} type="button" onClick={logout} disabled={loading} aria-label={loading ? "Signing out" : ariaLabel}>
+      {children || (loading ? "Signing out…" : "Sign out")}
     </button>
   );
 }

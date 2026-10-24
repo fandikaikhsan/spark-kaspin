@@ -2,396 +2,155 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
-import { hottestItem } from "@/lib/analytics/aggregate";
-import type { DailyAnalytics, HourlyItemSale, TransactionReceipt } from "@/lib/analytics/types";
+import { addDays, averageOrderValue, hourlyRevenue, localClock, percentageChange, productSales } from "@/lib/analytics/dashboard";
+import type { DailyAnalytics, DashboardMode, DashboardReport, DashboardTotals } from "@/lib/analytics/types";
+import { Delta, Icon, ProductMix, ReceiptCard, SalesChart, dateLabel, hours, money, number, sum } from "./dashboard-charts";
+import { ItemHeatmap, ReportDetails } from "./dashboard-details";
+import styles from "./dashboard.module.css";
 
-type ItemRow = {
-  itemCode: string;
-  itemName: string;
-  category: string;
-  totalQuantity: number;
-  totalRevenue: number;
-  hours: Map<number, HourlyItemSale>;
-};
-
-type Selection = { item: ItemRow; hour: number; sale: HourlyItemSale } | null;
-
-const numberFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
-const currencyFormatter = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
-});
-
-function receiptTime(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    timeZone,
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function redirectToLogin() {
-  const next = `${window.location.pathname}${window.location.search}`;
-  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
-}
-
-function ReceiptCard({
-  transaction,
-  timeZone,
-  isNew,
-}: {
-  transaction: TransactionReceipt;
-  timeZone: string;
-  isNew: boolean;
+export function Dashboard({ initialData, initialMode = "live", initialNow, user }: {
+  initialData: DailyAnalytics; initialMode?: DashboardMode; initialNow: number; user?: { username: string; role: "admin" | "super_admin" };
 }) {
-  return (
-    <article className={`receipt-card ${isNew ? "is-new" : ""}`}>
-      <div className="receipt-pin" aria-hidden="true" />
-      {isNew && <span className="new-receipt-label">New order</span>}
-      <div className="receipt-heading">
-        <div>
-          <span>Receipt</span>
-          <strong>#{transaction.receiptNumber}</strong>
-        </div>
-        <time dateTime={transaction.occurredAt}>
-          {receiptTime(transaction.occurredAt, timeZone)}
-        </time>
-      </div>
-      <div className="receipt-rule" />
-      <ul className="receipt-items">
-        {transaction.items.map((item) => (
-          <li key={item.lineNumber}>
-            <span><b>{numberFormatter.format(item.quantity)}×</b> {item.itemName}</span>
-            <strong>{currencyFormatter.format(item.grossSales)}</strong>
-          </li>
-        ))}
-      </ul>
-      <div className="receipt-rule" />
-      <div className="receipt-total">
-        <span>Total</span>
-        <strong>{currencyFormatter.format(transaction.grandTotal)}</strong>
-      </div>
-      <p className="receipt-payment">{transaction.paymentType}</p>
-    </article>
-  );
-}
-
-function buildRows(data: DailyAnalytics): ItemRow[] {
-  const byItem = new Map<string, ItemRow>();
-  for (const sale of data.hourlyItems) {
-    let row = byItem.get(sale.itemCode);
-    if (!row) {
-      row = {
-        itemCode: sale.itemCode,
-        itemName: sale.itemName,
-        category: sale.category,
-        totalQuantity: 0,
-        totalRevenue: 0,
-        hours: new Map(),
-      };
-      byItem.set(sale.itemCode, row);
-    }
-    row.totalQuantity += sale.quantity;
-    row.totalRevenue += sale.revenue;
-    row.hours.set(sale.hour, sale);
-  }
-  return [...byItem.values()]
-    .sort((a, b) => b.totalQuantity - a.totalQuantity || b.totalRevenue - a.totalRevenue)
-    .slice(0, 15);
-}
-
-export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
   const [data, setData] = useState(initialData);
+  const [mode, setMode] = useState<DashboardMode>(initialMode);
   const [date, setDate] = useState(initialData.date);
-  const [selection, setSelection] = useState<Selection>(null);
-  const [loading, setLoading] = useState(false);
+  const [storeId, setStoreId] = useState(initialData.store.id);
+  const [report, setReport] = useState<DashboardReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [newReceiptIds, setNewReceiptIds] = useState<Set<string>>(new Set());
-  const receiptRailRef = useRef<HTMLDivElement>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [now, setNow] = useState(initialNow);
+  const [openMenu, setOpenMenu] = useState<"inventory" | "catalogue" | null>(null);
+  const [newReceipts, setNewReceipts] = useState<Set<string>>(new Set());
+  const rail = useRef<HTMLDivElement>(null), nav = useRef<HTMLElement>(null), currentData = useRef(data);
+  const store = data.stores.find((store) => store.id === storeId) || initialData.store;
+  const clock = localClock(store.timeZone, new Date(now));
+  const selectedDate = mode === "live" ? clock.date : date;
+  const currentReport = report?.date === selectedDate && report.mode === mode && report.storeId === storeId ? report : null;
+  const ready = mode === "monthly" ? currentReport !== null : data.date === selectedDate && data.store.id === storeId;
+  const items = useMemo(() => mode === "monthly" ? currentReport?.hourlyItems || [] : data.hourlyItems, [mode, currentReport, data.hourlyItems]);
+  const products = useMemo(() => productSales(items), [items]);
+  const totals: DashboardTotals = mode === "monthly" ? {
+    revenue: sum(currentReport?.daily.map((day) => day.revenue) || []), units: sum(currentReport?.daily.map((day) => day.units) || []), transactions: sum(currentReport?.daily.map((day) => day.transactions) || []),
+  } : { revenue: data.totalRevenue, units: data.totalUnits, transactions: data.transactionCount };
+  const comparison = currentReport?.comparison, aov = averageOrderValue(totals);
+  const comparisonAov = comparison ? averageOrderValue(comparison) : null;
+  const comparisonLabel = currentReport ? mode === "monthly"
+    ? `vs ${dateLabel(currentReport.comparisonStart)}–${dateLabel(currentReport.comparisonEnd)}`
+    : `vs ${dateLabel(currentReport.comparisonStart)}${currentReport.comparisonThrough ? `, through ${currentReport.comparisonThrough.slice(11, 16)}` : ""}` : "";
+  const saleValues = mode === "monthly" ? currentReport?.daily.map((day) => day.revenue) || [] : hourlyRevenue(items);
+  const saleLabels = mode === "monthly" ? currentReport?.daily.map((day) => String(Number(day.date.slice(8)))) || [] : hours.map((hour) => `${String(hour).padStart(2, "0")}:00`);
+  const isToday = mode !== "monthly" && selectedDate === clock.date;
+  const feedMatches = data.store.id === storeId && data.date === selectedDate;
+  const syncAge = feedMatches && data.lastSyncedAt ? Math.max(0, (now - Date.parse(data.lastSyncedAt)) / 1000) : null;
+  const syncText = mode !== "live" ? "Historical view" : !feedMatches ? "Loading…" : data.source === "demo" ? "Sample data" : syncAge === null ? "No successful sync yet" : syncAge < 60 ? `Synced ${Math.floor(syncAge)}s ago` : syncAge < 3600 ? `Synced ${Math.floor(syncAge / 60)}m ago` : `Synced ${Math.floor(syncAge / 3600)}h ago`;
 
-  const rows = useMemo(() => buildRows(data), [data]);
-  const hottest = useMemo(() => hottestItem(data.hourlyItems), [data.hourlyItems]);
-  const maxCell = Math.max(1, ...data.hourlyItems.map((entry) => entry.quantity));
-  const hours = Array.from({ length: 24 }, (_, index) => index);
-
-  async function load(nextDate = date, nextStoreId = data.store.id, quiet = false) {
-    if (!quiet) setLoading(true);
-    setError(null);
-    try {
-      const parameters = new URLSearchParams({ date: nextDate, store: nextStoreId });
-      const response = await fetch(`/api/analytics?${parameters.toString()}`, {
-        cache: "no-store",
-      });
-      if (response.status === 401) {
-        redirectToLogin();
-        return;
-      }
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not refresh analytics");
-      const nextData = payload as DailyAnalytics;
-      const isSameFeed = nextData.store.id === data.store.id && nextData.date === data.date;
-      const existingIds = new Set(data.recentTransactions.map((transaction) => transaction.transactionCode));
-      const arrivals = isSameFeed
-        ? nextData.recentTransactions
-          .filter((transaction) => !existingIds.has(transaction.transactionCode))
-          .map((transaction) => transaction.transactionCode)
-        : [];
-      setData(nextData);
-      setDate(nextDate);
-      setSelection(null);
-      setNewReceiptIds(new Set(arrivals));
-      if (arrivals.length) window.setTimeout(() => setNewReceiptIds(new Set()), 4_000);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not refresh analytics");
-    } finally {
-      if (!quiet) setLoading(false);
+  useEffect(() => { currentData.current = data; }, [data]);
+  useEffect(() => { setNow(Date.now()); const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id); }, []);
+  useEffect(() => { window.history.replaceState(null, "", `/?${new URLSearchParams({ store: storeId, view: mode, date: selectedDate })}`); }, [mode, selectedDate, storeId]);
+  useEffect(() => {
+    if (mode === "monthly") { setLoading(false); return; }
+    const controller = new AbortController();
+    let active = true, inFlight = false;
+    async function load(quiet: boolean) {
+      if (inFlight) return;
+      inFlight = true;
+      if (!quiet) setLoading(true);
+      try {
+        const response = await fetch(`/api/analytics?${new URLSearchParams({ store: storeId, date: selectedDate })}`, { cache: "no-store", signal: controller.signal });
+        if (response.status === 401) { window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); return; }
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not refresh dashboard");
+        if (!active) return;
+        const next = payload as DailyAnalytics, previous = currentData.current;
+        const sameFeed = previous.date === next.date && previous.store.id === next.store.id;
+        const previousIds = new Set(previous.recentTransactions.map((receipt) => receipt.transactionCode));
+        const arrivals = sameFeed ? next.recentTransactions.filter((receipt) => !previousIds.has(receipt.transactionCode)).map((receipt) => receipt.transactionCode) : [];
+        currentData.current = next; setData(next); setError(null);
+        if (arrivals.length) setNewReceipts(new Set(arrivals));
+      } catch (reason) {
+        if (active && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Could not refresh dashboard");
+      } finally { inFlight = false; if (active) setLoading(false); }
     }
+    void load(false);
+    const timer = mode === "live" ? window.setInterval(() => void load(true), Math.max(3, data.refreshSeconds) * 1000) : null;
+    return () => { active = false; controller.abort(); if (timer !== null) window.clearInterval(timer); };
+  }, [selectedDate, storeId, mode, refreshKey, data.refreshSeconds]);
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true, inFlight = false;
+    async function load() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch(`/api/analytics/report?${new URLSearchParams({ store: storeId, date: selectedDate, mode })}`, { cache: "no-store", signal: controller.signal });
+        if (response.status === 401) { window.location.assign("/login"); return; }
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load period details");
+        if (active) { setReport(payload as DashboardReport); setReportError(null); }
+      } catch (reason) {
+        if (active && !controller.signal.aborted) setReportError(reason instanceof Error ? reason.message : "Could not load period details");
+      } finally { inFlight = false; }
+    }
+    void load();
+    const timer = mode === "live" ? window.setInterval(() => void load(), 60_000) : null;
+    return () => { active = false; controller.abort(); if (timer !== null) window.clearInterval(timer); };
+  }, [selectedDate, storeId, mode, refreshKey]);
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => rail.current?.scrollTo({ left: rail.current.scrollWidth, behavior: "auto" }));
+    setNewReceipts(new Set());
+    return () => window.cancelAnimationFrame(id);
+  }, [selectedDate, storeId, mode, ready]);
+  useEffect(() => {
+    if (!newReceipts.size) return;
+    rail.current?.scrollTo({ left: rail.current.scrollWidth, behavior: "smooth" });
+    const id = window.setTimeout(() => setNewReceipts(new Set()), 4000);
+    return () => window.clearTimeout(id);
+  }, [newReceipts]);
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = (event: PointerEvent) => { if (!nav.current?.contains(event.target as Node)) setOpenMenu(null); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpenMenu(null); };
+    document.addEventListener("pointerdown", close); document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); };
+  }, [openMenu]);
+
+  function changeMode(next: DashboardMode) {
+    if (next === mode) return;
+    if (next === "live") setDate(clock.date);
+    else if (next === "daily" && mode === "live") setDate(addDays(clock.date, -1));
+    setMode(next); setError(null); setReportError(null);
   }
 
-  useEffect(() => {
-    const timer = window.setInterval(
-      () => void load(date, data.store.id, true),
-      Math.max(3, data.refreshSeconds) * 1000,
-    );
-    return () => window.clearInterval(timer);
-    // Recreate the timer only when the selected date or configured interval changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, data.refreshSeconds, data.store.id]);
-
-  useEffect(() => {
-    const rail = receiptRailRef.current;
-    if (!rail) return;
-    const frame = window.requestAnimationFrame(() => {
-      rail.scrollTo({ left: rail.scrollWidth, behavior: "auto" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [data.date, data.store.id]);
-
-  useEffect(() => {
-    if (!newReceiptIds.size || !receiptRailRef.current) return;
-    receiptRailRef.current.scrollTo({
-      left: receiptRailRef.current.scrollWidth,
-      behavior: "smooth",
-    });
-  }, [newReceiptIds]);
-
-  return (
-    <main className="shell">
-      <header className="masthead">
-        <div className="dashboard-brand">
-          <div>
-            <h1>Spark Intelligence</h1>
-          </div>
-          <Image
-            className="sarkop-logo"
-            src="/logo_sarkop_red.png"
-            alt="Sarkop"
-            width={3166}
-            height={1590}
-            priority
-          />
-        </div>
-        <div className="date-controls">
-          <div className="control-labels">
-            <label htmlFor="store-select">Store</label>
-            <span className="control-links">
-              <Link href="/items">Items</Link>
-              <Link href="/bases">Bases</Link>
-              <Link href="/products">Products</Link><Link href="/stock-opname">Stock Opname</Link><Link href="/receiving">Receiving</Link>
-              <Link href="/settings">Settings</Link>
-              <LogoutButton />
-            </span>
-          </div>
-          <select
-            id="store-select"
-            value={data.store.id}
-            onChange={(event) => {
-              const nextStore = data.stores.find((store) => store.id === event.target.value);
-              if (!nextStore) return;
-              setDate(nextStore.businessDate);
-              void load(nextStore.businessDate, nextStore.id);
-            }}
-          >
-            {data.stores.map((store) => (
-              <option value={store.id} key={store.id}>{store.name} ({store.utcOffset})</option>
-            ))}
-          </select>
-          <label htmlFor="business-date">Business date</label>
-          <div className="control-row">
-            <input
-              id="business-date"
-              type="date"
-              value={date}
-              onChange={(event) => {
-                setDate(event.target.value);
-                void load(event.target.value, data.store.id);
-              }}
-            />
-            <button type="button" onClick={() => void load(date, data.store.id)} disabled={loading}>
-              {loading ? "Refreshing…" : "Refresh view"}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {data.source === "demo" && (
-        <div className="notice" role="status">
-          Previewing the supplied API sample. Connect Supabase and run a sync to show live POS data.
-        </div>
-      )}
-      {error && <div className="error" role="alert">{error}</div>}
-
-      <section className="metrics" aria-label="Daily totals">
-        <article className="metric metric-accent">
-          <span>Gross sales</span>
-          <strong>{currencyFormatter.format(data.totalRevenue)}</strong>
-          <small>{data.date}</small>
-        </article>
-        <article className="metric">
-          <span>Items sold</span>
-          <strong>{numberFormatter.format(data.totalUnits)}</strong>
-          <small>Net of returned quantities</small>
-        </article>
-        <article className="metric">
-          <span>Transactions</span>
-          <strong>{numberFormatter.format(data.transactionCount)}</strong>
-          <small>Receipts recorded</small>
-        </article>
-        <article className="metric">
-          <span>Top item</span>
-          <strong className="metric-name">{hottest?.itemName || "No sales yet"}</strong>
-          <small>{hottest ? `${numberFormatter.format(hottest.quantity)} units` : "—"}</small>
-        </article>
-      </section>
-
-      <section className="receipts-section" aria-labelledby="receipts-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Live order rail</p>
-            <h2 id="receipts-title">Recent transactions</h2>
-          </div>
-          <Link
-            className="section-link"
-            href={`/transactions?${new URLSearchParams({ store: data.store.id, date: data.date }).toString()}`}
-          >
-            See all transactions
-          </Link>
-        </div>
-
-        {data.recentTransactions.length ? (
-          <div className="receipt-rail" ref={receiptRailRef} aria-live="polite">
-            {data.recentTransactions.map((transaction) => (
-              <ReceiptCard
-                transaction={transaction}
-                timeZone={data.store.timeZone}
-                isNew={newReceiptIds.has(transaction.transactionCode)}
-                key={transaction.transactionCode}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state receipt-empty">No receipts have arrived for this date yet.</div>
-        )}
-      </section>
-
-      <section className="heatmap-section" aria-labelledby="heatmap-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Demand by hour</p>
-            <h2 id="heatmap-title">Item activity heatmap</h2>
-          </div>
-          <p className="sync-copy">
-            {data.lastSyncedAt
-              ? `Last synced ${new Date(data.lastSyncedAt).toLocaleString()}`
-              : data.refreshSeconds < 60
-                ? `View refreshes every ${data.refreshSeconds} sec`
-                : `View refreshes every ${Math.round(data.refreshSeconds / 60)} min`}
-          </p>
-        </div>
-
-        {rows.length ? (
-          <>
-            <div className="heatmap-scroll">
-              <div className="heatmap" role="grid" aria-label={`Item sales by hour for ${data.date}`}>
-                <div className="corner" role="columnheader">Top items</div>
-                {hours.map((hour) => (
-                  <div className="hour-label" role="columnheader" key={hour}>
-                    {String(hour).padStart(2, "0")}
-                  </div>
-                ))}
-
-                {rows.map((item) => (
-                  <div className="heatmap-row" role="row" key={item.itemCode}>
-                    <div className="item-label" role="rowheader">
-                      <span>{item.itemName}</span>
-                      <small>{numberFormatter.format(item.totalQuantity)} units</small>
-                    </div>
-                    {hours.map((hour) => {
-                      const sale = item.hours.get(hour);
-                      const quantity = sale?.quantity || 0;
-                      const intensity = quantity ? 0.16 + 0.84 * Math.sqrt(quantity / maxCell) : 0;
-                      const label = sale
-                        ? `${item.itemName}, ${String(hour).padStart(2, "0")}:00: ${numberFormatter.format(quantity)} units, ${currencyFormatter.format(sale.revenue)}`
-                        : `${item.itemName}, ${String(hour).padStart(2, "0")}:00: no sales`;
-                      return (
-                        <button
-                          type="button"
-                          role="gridcell"
-                          className={`heat-cell ${sale ? "has-sales" : ""}`}
-                          style={{ "--heat": intensity } as CSSProperties}
-                          aria-label={label}
-                          title={label}
-                          key={hour}
-                          onClick={() => sale && setSelection({ item, hour, sale })}
-                          disabled={!sale}
-                        >
-                          {sale && quantity >= maxCell * 0.7 ? numberFormatter.format(quantity) : <span className="sr-only">{label}</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="legend" aria-label="Heatmap scale">
-              <span>Fewer units</span>
-              {[0.16, 0.35, 0.55, 0.76, 1].map((value) => (
-                <span className="legend-cell" style={{ "--heat": value } as CSSProperties} key={value} />
-              ))}
-              <span>More units</span>
-            </div>
-          </>
-        ) : (
-          <div className="empty-state">No item transactions were recorded for this date.</div>
-        )}
-
-        <div className="selection" aria-live="polite">
-          {selection ? (
-            <>
-              <div>
-                <span className="selection-time">{String(selection.hour).padStart(2, "0")}:00–{String((selection.hour + 1) % 24).padStart(2, "0")}:00</span>
-                <strong>{selection.item.itemName}</strong>
-              </div>
-              <div>
-                <span>Units</span>
-                <strong>{numberFormatter.format(selection.sale.quantity)}</strong>
-              </div>
-              <div>
-                <span>Sales</span>
-                <strong>{currencyFormatter.format(selection.sale.revenue)}</strong>
-              </div>
-            </>
-          ) : (
-            <p>Select a colored cell to inspect that item and hour.</p>
-          )}
-        </div>
-      </section>
-    </main>
-  );
+  return <div className={styles.root}><div className={styles.app}>
+    <header className={styles.topbar}><Link href="/" className={styles.brand} aria-label="Sarkop dashboard"><Image src="/logo_sarkop_red.png" alt="Sarkop" width={3166} height={1590} priority /></Link>
+      <label className={styles.storePicker}><Icon name="pin" /><span className="sr-only">Store</span><select value={storeId} onChange={(event) => { const next = data.stores.find((store) => store.id === event.target.value); if (next) { const today = localClock(next.timeZone).date; setStoreId(next.id); setDate(mode === "live" || date > today ? today : date); setError(null); setReportError(null); } }}>{data.stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
+      <div className={styles.topbarSpace} /><span className={styles.sync} title={data.lastSyncedAt ? new Intl.DateTimeFormat("en-GB", { timeZone: store.timeZone, dateStyle: "medium", timeStyle: "medium" }).format(new Date(data.lastSyncedAt)) : undefined}><i className={mode === "live" && (syncAge === null || syncAge > 60) && data.source !== "demo" ? styles.staleDot : ""} />{syncText}</span>
+      <div className={styles.account}><span className={styles.avatar}>{(user?.username || "Account").slice(0, 2).toUpperCase()}</span><span>{user?.username || "Account"}<small>{user?.role === "super_admin" ? "Owner" : "Manager"}</small></span></div>
+    </header>
+    <div className={styles.body}><nav className={styles.sidebar} aria-label="Main navigation" ref={nav}>
+      <Link href="/" className={`${styles.navButton} ${styles.activeNav}`} aria-label="Dashboard" aria-current="page" title="Dashboard"><Icon name="chart" /></Link>
+      <div className={styles.navGroup}><button type="button" className={styles.navButton} aria-label="Inventory" title="Inventory" aria-expanded={openMenu === "inventory"} aria-controls="inventory-navigation" onClick={() => setOpenMenu(openMenu === "inventory" ? null : "inventory")}><Icon name="boxes" /></button>{openMenu === "inventory" && <div className={styles.flyout} id="inventory-navigation"><strong>Inventory</strong><span className={styles.futureNav}>Overview <small>Coming later</small></span><Link href="/stock-opname">Stock opname</Link><Link href="/receiving">Receiving</Link></div>}</div>
+      <button type="button" className={styles.navButton} disabled aria-label="Purchasing, coming later" title="Purchasing · coming later"><Icon name="cart" /></button>
+      <div className={styles.navGroup}><button type="button" className={styles.navButton} aria-label="Catalogue" title="Catalogue" aria-expanded={openMenu === "catalogue"} aria-controls="catalogue-navigation" onClick={() => setOpenMenu(openMenu === "catalogue" ? null : "catalogue")}><Icon name="book" /></button>{openMenu === "catalogue" && <div className={styles.flyout} id="catalogue-navigation"><strong>Catalogue</strong><Link href="/items">Items</Link><Link href="/bases">Bases</Link><Link href="/products">Products</Link></div>}</div>
+      <Link href="/settings" className={styles.navButton} aria-label="Settings" title="Settings"><Icon name="settings" /></Link><div className={styles.sidebarSpace} /><LogoutButton className={styles.navButton} ariaLabel="Sign out"><Icon name="logout" /></LogoutButton>
+    </nav>
+    <main className={styles.content}><div className={styles.heading}><h1>Dashboard</h1><div className={styles.periodControls}><div className={styles.tabs} role="tablist" aria-label="Dashboard view">{(["live", "daily", "monthly"] as const).map((view) => <button type="button" key={view} id={`view-${view}`} role="tab" aria-selected={mode === view} aria-controls="dashboard-view" onClick={() => changeMode(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}</div><label className={styles.calendar}><span className="sr-only">{mode === "monthly" ? "Month" : "Business date"}</span><input type={mode === "monthly" ? "month" : "date"} value={mode === "monthly" ? selectedDate.slice(0, 7) : selectedDate} max={mode === "monthly" ? clock.date.slice(0, 7) : clock.date} onChange={(event) => { if (!event.target.value) return; const next = mode === "monthly" ? `${event.target.value}-01` : event.target.value; if (mode === "live" && next !== clock.date) setMode("daily"); setDate(next); setError(null); setReportError(null); }} /></label><button className={styles.refresh} type="button" aria-label="Refresh dashboard" title="Refresh dashboard" disabled={loading} onClick={() => setRefreshKey((key) => key + 1)}><Icon name="refresh" /></button></div></div>
+      {data.source === "demo" && <div className={styles.notice}>Sample data · connect Supabase and sync transactions to see live sales.</div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
+      {reportError && <div className={styles.notice} role="status">Period details unavailable: {reportError} <button type="button" onClick={() => setRefreshKey((key) => key + 1)}>Retry</button></div>}
+      <div id="dashboard-view" role="tabpanel" aria-labelledby={`view-${mode}`} aria-busy={loading || !ready} className={styles.view}>
+        {!ready ? <section className={`${styles.panel} ${styles.loading}`} role="status">{reportError || error ? "Unable to load this period. Use Refresh to try again." : "Loading sales for this period…"}</section> : <>
+          <div className={styles.mainGrid}><div className={styles.salesStack}>
+            <section className={`${styles.panel} ${styles.hero}`} aria-labelledby="gross-title"><h2 id="gross-title">Gross sales{mode === "monthly" && selectedDate.slice(0, 7) === clock.date.slice(0, 7) ? " · MTD" : ""}</h2><strong className={styles.grossValue}>{money(totals.revenue)}</strong><Delta value={percentageChange(totals.revenue, comparison?.revenue)} label={comparisonLabel} /><div className={styles.chartHeading}><span>Gross sales by {mode === "monthly" ? "day" : "hour"}</span><span>IDR</span></div><SalesChart values={saleValues} labels={saleLabels} partialIndex={isToday ? clock.hour : mode === "monthly" && currentReport?.endDate === clock.date ? saleValues.length - 1 : undefined} futureAfter={isToday ? clock.hour : undefined} /><div className={styles.chartLegend}><span><i />{mode === "monthly" ? dateLabel(`${selectedDate.slice(0, 7)}-01`, { month: "long" }) : dateLabel(selectedDate)}</span>{(isToday || mode === "monthly" && currentReport?.endDate === clock.date) && <span>Current {mode === "monthly" ? "day" : "hour"} is partial · {store.timeZone === "Asia/Makassar" ? "WITA" : "WIB"}</span>}</div></section>
+            <div className={styles.kpis}><section className={`${styles.panel} ${styles.kpi}`}><h2><Icon name="package" />Items sold</h2><strong>{number.format(totals.units)}</strong><Delta value={percentageChange(totals.units, comparison?.units)} label={comparisonLabel} /></section><section className={`${styles.panel} ${styles.kpi}`}><h2><Icon name="receipt" />Transactions</h2><strong>{number.format(totals.transactions)}</strong><Delta value={percentageChange(totals.transactions, comparison?.transactions)} label={comparisonLabel} /></section><section className={`${styles.panel} ${styles.kpi} ${styles.aov}`}><h2><Icon name="wallet" />Avg order value</h2><strong>{aov === null ? "—" : money(aov)}</strong><Delta value={aov === null ? null : percentageChange(aov, comparisonAov)} label={comparisonLabel} /></section></div>
+          </div><ProductMix products={products} /></div>
+          {mode === "live" ? <><ItemHeatmap key={`${selectedDate}-${storeId}`} products={products} date={selectedDate} today={clock.date} currentHour={clock.hour} timeZone={store.timeZone} /><section className={`${styles.panel} ${styles.railPanel}`} aria-labelledby="receipts-title"><div className={styles.panelHeading}><h2 id="receipts-title">Recent transactions</h2><Link className={styles.sectionLink} href={`/transactions?${new URLSearchParams({ store: storeId, date: selectedDate })}`}>See all transactions <span aria-hidden="true">↗</span></Link></div>{data.recentTransactions.length ? <div className={`receipt-rail ${styles.receiptRail}`} ref={rail} aria-label="Live order rail, latest receipts on the right">{data.recentTransactions.map((receipt) => <ReceiptCard key={receipt.transactionCode} transaction={receipt} timeZone={store.timeZone} isNew={newReceipts.has(receipt.transactionCode)} />)}</div> : <div className={styles.empty}>No receipts have arrived for this date yet.</div>}</section></> : currentReport ? <ReportDetails report={currentReport} products={products} /> : <section className={styles.panel}><p className={styles.caption}>Loading period details…</p></section>}
+        </>}
+      </div>
+    </main></div>
+  </div></div>;
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Spark Intelligence",
+  title: "Sarkop Dashboard",
   description: "Daily item sales and transaction activity from the POS system.",
 };
 

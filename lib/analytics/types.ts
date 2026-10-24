@@ -60,3 +60,28 @@ export type DailyAnalytics = {
   hourlyItems: HourlyItemSale[];
   recentTransactions: TransactionReceipt[];
 };
+
+export type DashboardMode = "live" | "daily" | "monthly";
+
+export type DatedHourlyItemSale = HourlyItemSale & { date: string };
+export type DashboardTotals = {
+  revenue: number;
+  units: number;
+  transactions: number;
+};
+export type DashboardReport = {
+  date: string;
+  mode: DashboardMode;
+  storeId: string;
+  source: "supabase" | "demo";
+  startDate: string;
+  endDate: string;
+  hourlyItems: DatedHourlyItemSale[];
+  daily: (DashboardTotals & { date: string })[];
+  baskets: { label: string; count: number }[];
+  weekdayHours: { weekday: number; occurrences: number; hours: number[] }[];
+  comparison: DashboardTotals | null;
+  comparisonStart: string;
+  comparisonEnd: string;
+  comparisonThrough: string | null;
+};
