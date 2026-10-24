@@ -21,7 +21,7 @@
     "aws:validate": "sam validate --lint"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

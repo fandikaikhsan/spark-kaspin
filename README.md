@@ -84,7 +84,7 @@ Prerequisites:
 
 - AWS CLI configured with your account or AWS SSO
 - AWS SAM CLI
-- Node.js 20 or newer
+- Node.js 22 or newer
 - pnpm
 
 Verify the tools:
@@ -195,7 +195,7 @@ Costs are calculated from current material prices and yields when the catalog lo
 
 ### Local Supabase with a production data snapshot (Windows)
 
-Install Docker Desktop with its WSL 2 backend, complete any required Windows restart, and open Docker Desktop until its Linux engine is running. The project includes the Supabase CLI as a dev dependency. Node.js 20.12+ is required for the local helper scripts.
+Install Docker Desktop with its WSL 2 backend, complete any required Windows restart, and open Docker Desktop until its Linux engine is running. The project includes the Supabase CLI as a dev dependency. Use Node.js 22 or newer for the app and local helper scripts.
 
 Add `SUPABASE_PRODUCTION_DB_URL` to the root `.env` using **Supabase Dashboard → Connect → Session pooler** (port 5432). Substitute the actual database password and URL-encode special characters. The existing Supabase API secret is a different credential. Keep the URI in `.env`; the helper does not print credentials or place the password in command arguments.
 
@@ -257,6 +257,8 @@ pnpm dev
 ```
 
 Without Supabase variables, the dashboard intentionally renders the supplied sample-data preview.
+
+Deployment uses `pnpm@10.17.1` and requires Node.js 22 or newer, as declared in `package.json`. Keep `pnpm-lock.yaml` committed and synchronized whenever dependencies change. If you installed or updated dependencies with npm, run `pnpm import` to synchronize from `package-lock.json`, then verify with `pnpm install --frozen-lockfile` before pushing. Deployment checks the lockfile strictly and stops before the build if it is out of date.
 
 ## Environment variables
 
