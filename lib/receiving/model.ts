@@ -1,12 +1,17 @@
-import { ItemError, parseItemId } from "@/lib/items/model";
+import { BASE_UNITS, ItemError, parseItemId, standardConversion, type BaseUnit } from "@/lib/items/model";
 import { EMPLOYEE_NAMES, type EmployeeName } from "@/lib/operations/employees";
 
 // Operational catalog projection: no prices or supplier details are sent to the form.
-export type ReceivingItem = { id: string; name: string; purchaseUnitName: string; updatedAt: string };
-export type ReceivingLineInput = { itemId: string; quantity: number; itemUpdatedAt: string };
+export type ReceivingItem = { id: string; name: string; baseUom: BaseUnit; purchaseUnitName: string; updatedAt: string };
+export type ReceivingLineInput = { itemId: string; quantity: number; uom: string; itemUpdatedAt: string };
 export type ReceivingInput = { id: string; storeId: string; receivedBy: EmployeeName; lines: ReceivingLineInput[] };
 export type Receiving = { id: string; storeId: string; receivedBy: string; receivedAt: string;
   lines: { itemId: string; name: string; quantity: number; uom: string }[] };
+
+export function receivingUnits(item: ReceivingItem): string[] {
+  const compatible = BASE_UNITS.filter((unit) => { try { return standardConversion(unit, item.baseUom) !== null; } catch { return false; } });
+  return [...new Set([item.purchaseUnitName, ...compatible])];
+}
 
 export function parseReceivingUuid(value: unknown, label: string): string {
   if (typeof value !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) throw new ItemError(`${label} tidak valid`);
@@ -29,7 +34,9 @@ export function parseReceiving(value: unknown): ReceivingInput {
     if (typeof row.quantity !== "number" || !Number.isFinite(row.quantity) || row.quantity < 1e-9 || row.quantity > 1e12) throw new ItemError(`Jumlah baris ${index + 1} harus lebih dari 0 (minimal 0,000000001)`);
     // Keep PostgreSQL's microseconds intact when comparing the selected item revision.
     if (typeof row.itemUpdatedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(row.itemUpdatedAt) || !Number.isFinite(Date.parse(row.itemUpdatedAt))) throw new ItemError("Data barang tidak lengkap. Muat ulang halaman.");
-    return { itemId, quantity: row.quantity, itemUpdatedAt: row.itemUpdatedAt };
+    if (typeof row.uom !== "string" || !row.uom.trim() || row.uom.trim().length > 80) throw new ItemError(`Pilih satuan pada baris ${index + 1}`);
+    const uom = row.uom.trim();
+    return { itemId, quantity: row.quantity, uom: BASE_UNITS.includes(uom.toLowerCase() as BaseUnit) ? uom.toLowerCase() : uom, itemUpdatedAt: row.itemUpdatedAt };
   });
   return { id, storeId, receivedBy: input.receivedBy as EmployeeName, lines };
 }

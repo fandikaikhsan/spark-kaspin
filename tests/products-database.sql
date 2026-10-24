@@ -40,7 +40,7 @@ begin
   exception when check_violation then null; end;
   set constraints all deferred;
   begin
-    update public.recipes set yield_qty=2 where id=v_recipe; raise exception 'Product yield other than one accepted';
+    update public.recipes set yield_qty=0 where id=v_recipe; raise exception 'Zero product yield accepted';
   exception when check_violation then null; end;
   begin
     insert into public.products(id,name,type,sales_price,recipe_id) values('QA-PRODUCT-ORPHAN','Orphan','menu',1,gen_random_uuid());

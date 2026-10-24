@@ -8,7 +8,7 @@ import { GET, POST } from "@/app/api/products/route";
 import { PATCH, DELETE } from "@/app/api/products/[id]/route";
 import { GET as GET_CATEGORY, POST as POST_CATEGORY } from "@/app/api/categories/route";
 const secret = process.env.AUTH_SESSION_SECRET;
-const input = { id: "MENU-001", name: "Water", type: "menu", parentProductId: null, categoryId: null, salesPrice: 5000, ingredients: [{ kind: "item", ingredientId: "WATER", quantity: 1, uom: "pcs" }] };
+const input = { id: "MENU-001", name: "Water", type: "menu", parentProductId: null, categoryId: null, salesPrice: 5000, baseUom: "porsi", yieldQuantity: 1, ingredients: [{ kind: "item", ingredientId: "WATER", quantity: 1, uom: "pcs" }] };
 const category = { id: "00000000-0000-4000-8000-000000000001", name: "Drinks" };
 const context = { params: Promise.resolve({ id: "MENU-001" }) };
 const request = (method: string, body?: unknown) => new Request("http://localhost/api/products", { method, ...(body ? { body: JSON.stringify(body) } : {}) });

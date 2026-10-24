@@ -9,7 +9,7 @@
 .index { align-self: center; font-size: .7rem; color: var(--muted); }
 .row :is(.item,.quantity,.unit) { min-width: 0; }
 .row :is(.item,.quantity,.unit) > span { display: block; margin-bottom: 6px; font-size: .72rem; font-weight: 650; }
-.row input { display: block; width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #fffefa; color: var(--ink); font-size: .83rem; }
+.row :is(input,select) { display: block; width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #fffefa; color: var(--ink); font-size: .83rem; }
 .row :global(.engineering-options) { font-size: .82rem; }
 .row :global(.engineering-options) small { display: block; }
 .unit output { display: flex; align-items: center; min-height: 39px; padding: 8px 10px; border-radius: 7px; background: var(--paper); font-size: .83rem; overflow-wrap: anywhere; }
@@ -30,5 +30,5 @@
   .quantity { grid-row: 2; grid-column: 2; }
   .unit { grid-row: 2; grid-column: 3; }
   .remove { grid-row: 2; grid-column: 4; }
-  .row input { font-size: 16px; }
+  .row :is(input,select) { font-size: 16px; }
 }

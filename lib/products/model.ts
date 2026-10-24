@@ -1,11 +1,11 @@
 import { BASE_UNITS, ItemError, itemCost, parseItemId, standardConversion, type Item } from "@/lib/items/model";
-import { baseCost, ingredientQuantityBase, ingredientUnits, type PreparedBase } from "@/lib/bases/model";
+import { OUTPUT_UNITS, baseCost, ingredientQuantityBase, ingredientUnits, type OutputUnit, type PreparedBase } from "@/lib/bases/model";
 export const PRODUCT_TYPES = ["menu", "variant", "addon"] as const;
 export type ProductType = typeof PRODUCT_TYPES[number];
 export const PRODUCT_LABELS: Record<ProductType, string> = { menu: "Menu", variant: "Variant", addon: "Add-on" };
 export type Category = { id: string; name: string };
 export type ProductIngredient = { kind: "item" | "base"; ingredientId: string; quantity: number; uom: string };
-export type ProductInput = { id?: string; name: string; type: ProductType; parentProductId: string | null; categoryId: string | null; salesPrice: number; ingredients: ProductIngredient[] };
+export type ProductInput = { id?: string; name: string; type: ProductType; parentProductId: string | null; categoryId: string | null; salesPrice: number; baseUom: OutputUnit; yieldQuantity: number; ingredients: ProductIngredient[] };
 export type Product = ProductInput & { id: string; recipeId: string; updatedAt: string };
 export type ProductCatalog = { products: Product[]; categories: Category[]; items: Item[]; bases: PreparedBase[] };
 export function parseProductId(value: unknown): string {
@@ -34,6 +34,10 @@ export function parseProductInput(value: unknown): ProductInput {
     categoryId = input.categoryId;
   }
   if (typeof input.salesPrice !== "number" || !Number.isFinite(input.salesPrice) || input.salesPrice < 0 || input.salesPrice > 1e12) throw new ItemError("Selling price must be zero or positive (maximum 1 trillion)");
+  const baseUom = input.baseUom;
+  const yieldQuantity = input.yieldQuantity;
+  if (!OUTPUT_UNITS.includes(baseUom as OutputUnit)) throw new ItemError("Choose an output unit: portions, g, kg, ml, l, or pcs");
+  if (typeof yieldQuantity !== "number" || !Number.isFinite(yieldQuantity) || yieldQuantity < 1e-9 || yieldQuantity > 1e12) throw new ItemError("Batch yield must be positive (0.000000001 to 1 trillion)");
   if (!Array.isArray(input.ingredients) || !input.ingredients.length || input.ingredients.length > 200) throw new ItemError("Add between 1 and 200 ingredients");
   const ingredients = input.ingredients.map((value, index): ProductIngredient => {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new ItemError(`Ingredient ${index + 1} is invalid`);
@@ -46,7 +50,7 @@ export function parseProductInput(value: unknown): ProductInput {
     const uom = [...BASE_UNITS, "porsi"].includes(trimmedUnit.toLowerCase()) ? trimmedUnit.toLowerCase() : trimmedUnit;
     return { kind: row.kind, ingredientId, quantity: row.quantity, uom };
   });
-  return { ...(id ? { id } : {}), name: input.name.trim(), type, parentProductId, categoryId, salesPrice: input.salesPrice, ingredients };
+  return { ...(id ? { id } : {}), name: input.name.trim(), type, parentProductId, categoryId, salesPrice: input.salesPrice, baseUom: baseUom as OutputUnit, yieldQuantity, ingredients };
 }
 export function preparedBaseUnits(base: PreparedBase): string[] {
   if (base.baseUom === "porsi") return ["porsi"];
@@ -56,7 +60,9 @@ export function productIngredientUnits(row: Pick<ProductIngredient, "kind" | "in
   if (row.kind === "item") { const item = items.find((item) => item.id === row.ingredientId); return item ? ingredientUnits(item) : []; }
   const base = bases.find((base) => base.id === row.ingredientId); return base ? preparedBaseUnits(base) : [];
 }
-export function productCost(input: Pick<ProductInput, "ingredients" | "salesPrice">, items: Item[], bases: PreparedBase[]) {
+export function productCost(input: Pick<ProductInput, "ingredients" | "salesPrice"> & Partial<Pick<ProductInput, "yieldQuantity">>, items: Item[], bases: PreparedBase[]) {
+  const yieldQuantity = input.yieldQuantity ?? 1;
+  if (!Number.isFinite(yieldQuantity) || yieldQuantity < 1e-9 || yieldQuantity > 1e12) throw new ItemError("Batch yield must be positive");
   const itemMap = new Map(items.map((item) => [item.id, item]));
   const baseMap = new Map(bases.map((base) => [base.id, base]));
   const lineCosts = input.ingredients.map((row) => {
@@ -74,7 +80,8 @@ export function productCost(input: Pick<ProductInput, "ingredients" | "salesPric
     return row.quantity * factor * baseCost(base, items).unitCost;
   });
   const totalProductionCost = lineCosts.reduce((sum, cost) => sum + cost, 0);
-  const margin = input.salesPrice - totalProductionCost;
-  return { lineCosts, totalProductionCost, margin, costPercentage: input.salesPrice > 0 ? totalProductionCost / input.salesPrice * 100 : null,
+  const unitCost = totalProductionCost / yieldQuantity;
+  const margin = input.salesPrice - unitCost;
+  return { lineCosts, totalProductionCost, unitCost, margin, costPercentage: input.salesPrice > 0 ? unitCost / input.salesPrice * 100 : null,
     marginPercentage: input.salesPrice > 0 ? margin / input.salesPrice * 100 : null };
 }

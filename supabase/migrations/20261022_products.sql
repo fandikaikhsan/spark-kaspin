@@ -25,7 +25,12 @@ alter table public.recipes add column if not exists output_product_id text uniqu
 alter table public.recipes drop constraint if exists recipes_output_required;
 alter table public.recipes add constraint recipes_output_required check (num_nonnulls(output_base_id,output_product_id) = 1);
 alter table public.recipes drop constraint if exists recipes_product_yield;
-alter table public.recipes add constraint recipes_product_yield check (output_product_id is null or yield_qty = 1);
+do $$ begin
+  -- Newer schemas allow batch yields; do not restore the old limit on replay.
+  if not exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='base_uom') then
+    alter table public.recipes add constraint recipes_product_yield check (output_product_id is null or yield_qty = 1);
+  end if;
+end $$;
 do $$ begin
   if not exists (select 1 from pg_constraint where conrelid='public.recipes'::regclass and conname='recipes_id_product_key') then
     alter table public.recipes add constraint recipes_id_product_key unique(id,output_product_id);
