@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
+import { isEmployeeFormRequest } from "@/lib/operations/access";
 
 export async function middleware(request: NextRequest) {
+  if (isEmployeeFormRequest(request.nextUrl.pathname, request.method)) return NextResponse.next();
   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
   if (session) return NextResponse.next();
 

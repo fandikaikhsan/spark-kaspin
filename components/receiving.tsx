@@ -10,13 +10,13 @@ import common from "./stock-opname.module.css";
 import styles from "./receiving.module.css";
 
 type DraftLine = { key: number; itemId: string; quantity: string; uom: string };
-async function responseError(response: Response) {
-  if (response.status === 401) window.location.assign("/login?next=/receiving");
+async function responseError(response: Response, employeeMode = false) {
+  if (response.status === 401 && !employeeMode) window.location.assign("/login?next=/receiving");
   const data = await response.json().catch(() => ({}));
   return data.error || "Gagal menghubungi server. Coba lagi; isian tetap ada di formulir ini.";
 }
-export function ReceivingPage({ stores, items, initialReceivings, initialError }: {
-  stores: Store[]; items: ReceivingItem[]; initialReceivings: Receiving[]; initialError: string | null;
+export function ReceivingPage({ stores, items, initialReceivings, initialError, employeeMode = false }: {
+  stores: Store[]; items: ReceivingItem[]; initialReceivings: Receiving[]; initialError: string | null; employeeMode?: boolean;
 }) {
   const [storeId, setStoreId] = useState(stores[0]?.id || "");
   const [receivedBy, setReceivedBy] = useState("");
@@ -46,30 +46,30 @@ export function ReceivingPage({ stores, items, initialReceivings, initialError }
       const input = parseReceiving({ id: token.current, storeId, receivedBy, lines: lines.map((line) => ({ itemId: line.itemId,
         uom: line.uom, quantity: line.quantity.trim() ? Number(line.quantity) : null, itemUpdatedAt: items.find((item) => item.id === line.itemId)?.updatedAt })) });
       inFlight.current = true; setBusy(true);
-      const response = await fetch("/api/receiving", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
-      if (!response.ok) throw new Error(await responseError(response));
+      const response = await fetch(employeeMode ? "/api/staff/receiving" : "/api/receiving", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+      if (!response.ok) throw new Error(await responseError(response, employeeMode));
       const result = await response.json(); setSavedId(result.id);
       // A history refresh failure must not turn a successful save into a failed receipt.
-      await refreshHistory(storeId);
+      if (!employeeMode) await refreshHistory(storeId);
     } catch (error) { setError(error instanceof Error ? error.message : "Receiving gagal disimpan"); }
     finally { inFlight.current = false; setBusy(false); }
   }
   function reset() { setReceivedBy(""); setLines([{ key: nextKey.current++, itemId: "", quantity: "", uom: "" }]); token.current = null; setSavedId(null); setError(null); }
-  return <main className={`shell ${common.shell} ${styles.page}`}>
-    <header className={`subpage-header ${common.header}`}><div><p className="eyebrow">Spark Intelligence · Operasional</p><h1>Receiving</h1><p className="subtitle">Catat barang yang datang, lalu simpan.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><LogoutButton /></nav>
+  return <div className={common.backdrop}><main className={`shell ${common.shell} ${styles.page} ${employeeMode ? common.employee : ""}`}>
+    <header className={`subpage-header ${common.header}`}><div><h1>Receiving</h1></div>
+      {!employeeMode && <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><LogoutButton /></nav>}
     </header>
-    {!stores.length && <p className="error" role="alert">Tidak ada toko aktif. Periksa koneksi database dan pengaturan toko, lalu muat ulang halaman.</p>}
+    {!stores.length && <p className="error" role="alert">Toko belum tersedia. Hubungi pengelola toko atau muat ulang halaman.</p>}
     <form onSubmit={(event) => void submit(event)} aria-label="Form receiving">
       <fieldset className={common.fieldset} disabled={busy || Boolean(savedId) || !stores.length || !items.length}>
         <div className={`${common.meta} ${styles.meta}`}>
-          <label><span>Toko *</span><select aria-label="Toko" required value={storeId} onChange={(event) => { setStoreId(event.target.value); setReceivings([]); void refreshHistory(event.target.value); }}><option value="" disabled>Pilih toko</option>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}</option>)}</select></label>
-          <label><span>Nama penerima *</span><select aria-label="Nama penerima" required value={receivedBy} onChange={(event) => setReceivedBy(event.target.value)}><option value="" disabled>Siapa yang menerima?</option>{EMPLOYEE_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-          <p className={styles.timeNote}>Tanggal dan waktu dicatat otomatis saat disimpan.</p>
+          <label><span>Toko *</span><select aria-label="Toko" required value={storeId} onChange={(event) => { setStoreId(event.target.value); setReceivings([]); if (!employeeMode) void refreshHistory(event.target.value); }}><option value="" disabled>Pilih toko</option>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}</option>)}</select></label>
+          <label><span>Nama penerima *</span><select aria-label="Nama penerima" required value={receivedBy} onChange={(event) => setReceivedBy(event.target.value)}><option value="" disabled>Pilih nama</option>{EMPLOYEE_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+          <p className={styles.timeNote}>Tanggal dan waktu dicatat otomatis saat Selesai.</p>
         </div>
         <section className={styles.panel} aria-labelledby="receiving-items-heading">
-          <div className={styles.panelHeading}><h2 id="receiving-items-heading">Barang diterima</h2><p>Pilih satuan sesuai barang yang diterima. Satuan kemasan mengikuti ukuran yang diatur di Items.</p></div>
-          {!items.length && <p className="notice">Belum ada barang tersedia. Tambahkan barang di <Link href="/items">Items</Link>, lalu muat ulang halaman ini.</p>}
+          <div className={styles.panelHeading}><h2 id="receiving-items-heading">Barang diterima</h2><p>Pilih barang, isi jumlah, lalu pilih satuan.</p></div>
+          {!items.length && <p className="notice">Barang belum tersedia. Hubungi pengelola toko, lalu muat ulang halaman ini.</p>}
           <div className={styles.rows}>{lines.map((line, index) => {
             const item = items.find((item) => item.id === line.itemId);
             return <div className={styles.row} key={line.key}>
@@ -84,15 +84,15 @@ export function ReceivingPage({ stores, items, initialReceivings, initialError }
         </section>
       </fieldset>
       {error && <p className="error" role="alert">{error}</p>}
-      {savedId ? <div className={common.receipt} role="status"><div><strong>Receiving tersimpan.</strong><p>{receivedBy} · {lines.length} barang · {stores.find((store) => store.id === storeId)?.name}</p></div><button type="button" onClick={reset}>Catat penerimaan baru</button></div> : <div className={common.actions}><div><strong>{lines.length} barang</strong><span>Isi jumlah yang benar-benar diterima.</span></div><button type="submit" disabled={busy || !stores.length || !items.length}>{busy ? "Menyimpan…" : "Simpan receiving"}</button></div>}
+      {savedId ? <div className={common.receipt} role="status"><div><strong>Receiving tersimpan.</strong><p>{receivedBy} · {lines.length} barang · {stores.find((store) => store.id === storeId)?.name}</p></div><button type="button" onClick={reset}>Catat penerimaan baru</button></div> : <div className={common.actions}><button type="submit" disabled={busy || !stores.length || !items.length}>{busy ? "Menyimpan…" : "Selesai"}</button></div>}
     </form>
-    <details className={common.history}><summary>Riwayat penerimaan <span>10 terakhir · toko terpilih</span></summary><div className={common.historyBody}>
+    {!employeeMode && <details className={common.history}><summary>Riwayat penerimaan <span>10 terakhir · toko terpilih</span></summary><div className={common.historyBody}>
       <button className={common.refresh} type="button" disabled={busy || loading || !storeId} onClick={() => void refreshHistory(storeId)}>{loading ? "Memuat…" : "Muat ulang riwayat"}</button>
       {historyError && <p className="error" role="alert">{historyError}</p>}
       {!receivings.length && !loading && !historyError && <p className={common.empty}>Belum ada penerimaan tersimpan.</p>}
       {receivings.map((receiving) => <details className={common.submission} key={receiving.id}><summary><strong>{timestamp(receiving.receivedAt)}</strong> · {receiving.receivedBy}<small>{receiving.lines.length} barang</small></summary>
         <div className={styles.savedRows}>{receiving.lines.map((line) => <div className={styles.savedRow} key={line.itemId}><span>{line.name}<small>{line.itemId}</small></span><strong>{new Intl.NumberFormat("id-ID", { maximumFractionDigits: 9 }).format(line.quantity)} {line.uom}</strong></div>)}</div>
       </details>)}
-    </div></details>
-  </main>;
+    </div></details>}
+  </main></div>;
 }

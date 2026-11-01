@@ -2,6 +2,7 @@ import { ItemError } from "@/lib/items/model";
 import { COUNTERS, STOCK_FIELDS, type CounterName, type StockSection } from "./template";
 export type StockAnswers = Record<string, number | boolean>;
 export type StockOpnameInput = { id: string; storeId: string; countDate: string; countedAt?: string; countedBy: CounterName; answers: StockAnswers };
+export type StockEntryInput = Omit<StockOpnameInput, "countDate" | "countedAt">;
 export type StockLine = { key: string; section: StockSection; name: string; uom: string | null; note: string; quantity: number | null; needsRestock: boolean | null };
 export type StockOpname = { id: string; storeId: string; countDate: string; countedAt?: string | null; countedBy: string; submittedAt: string; lines: StockLine[] };
 export function parseStockUuid(value: unknown, label: string): string {
@@ -30,7 +31,13 @@ export function parseStockOpname(value: unknown): StockOpnameInput {
   if (input.countedAt !== undefined && (typeof input.countedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(input.countedAt) || !Number.isFinite(Date.parse(input.countedAt)))) throw new ItemError("Waktu penghitungan tidak valid");
   return { id, storeId, countDate: input.countDate, ...(input.countedAt !== undefined ? { countedAt: input.countedAt as string } : {}), countedBy: input.countedBy as CounterName, answers };
 }
-export function stockLines(input: StockOpnameInput): StockLine[] {
+export function parseStockEntry(value: unknown): StockEntryInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ItemError("Data stock opname diperlukan");
+  // Reuse the complete answer validation, but never accept a client-supplied date/time.
+  const parsed = parseStockOpname({ ...value, countDate: "2000-01-01", countedAt: undefined });
+  return { id: parsed.id, storeId: parsed.storeId, countedBy: parsed.countedBy, answers: parsed.answers };
+}
+export function stockLines(input: Pick<StockOpnameInput, "answers">): StockLine[] {
   return STOCK_FIELDS.map((field) => ({ key: field.key, section: field.section, name: field.name, uom: field.uom, note: field.note,
     quantity: field.section === "restock" ? null : input.answers[field.key] as number,
     needsRestock: field.section === "restock" ? input.answers[field.key] as boolean : null }));

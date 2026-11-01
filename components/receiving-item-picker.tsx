@@ -21,15 +21,16 @@ export function ReceivingItemPicker({ label, value, items, onChange }: { label: 
     <label className="sr-only" htmlFor={id}>{label}</label>
     <input id={id} role="combobox" required autoComplete="off" aria-autocomplete="list" aria-expanded={open} aria-controls={open ? `${id}-options` : undefined}
       aria-activedescendant={open && filtered[active] ? `${id}-option-${active}` : undefined}
-      value={query ?? (selected ? `${selected.name} · ${selected.id}` : "")} placeholder="Cari nama / ID barang…"
+      value={query ?? selected?.name ?? ""} placeholder="Cari nama / ID barang…"
       onFocus={() => { setOpen(true); setActive(0); }} onKeyDown={keyDown}
       onChange={(event) => { setQuery(event.target.value); onChange(""); setOpen(true); setActive(0); }} />
+    {selected && <small className="engineering-selected-id">ID: {selected.id}</small>}
     {open && <ul className="engineering-options" role="listbox" id={`${id}-options`} aria-label={label}>
       {filtered.map((item, index) => <li id={`${id}-option-${index}`} key={item.id} role="option" aria-selected={value === item.id}
         className={active === index ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => choose(item)}>
         <strong>{item.name}</strong><small>{item.id} · {item.purchaseUnitName}</small>
       </li>)}
-      {!filtered.length && <li role="presentation">Barang tidak ditemukan. Barang harus terdaftar di Items.</li>}
+      {!filtered.length && <li role="presentation">Barang tidak ditemukan. Hubungi pengelola toko.</li>}
     </ul>}
   </div>;
 }

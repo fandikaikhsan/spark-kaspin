@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ItemError } from "@/lib/items/model";
 import { STOCK_FIELDS } from "./template";
-import { stockLines, type StockOpname, type StockOpnameInput } from "./model";
+import { stockLines, type StockOpname, type StockOpnameInput, type StockEntryInput } from "./model";
 function databaseError(error: { code: string; message: string }): never {
   if (["PGRST202", "PGRST205", "42P01", "42703", "42883"].includes(error.code)) throw new ItemError("Stock Opname belum terpasang. Jalankan npm.cmd run local:migrate untuk database lokal.", 503);
   if (error.code === "23505") throw new ItemError("Pengiriman ini sudah tersimpan dengan jawaban berbeda. Periksa riwayat sebelum mengisi ulang.", 409);
@@ -19,17 +19,26 @@ async function references(table: "items" | "bases"): Promise<Reference[]> {
     if (!data || data.length < 1000) return rows;
   }
 }
-export async function saveStockOpname(input: StockOpnameInput, submittedBy: string): Promise<{ id: string; replayed: boolean }> {
+async function submissionLines(input: Pick<StockOpnameInput, "answers">) {
   // Only IDs/names are needed for optional links. Prices are never part of this form.
   const [items, bases] = await Promise.all([references("items"), references("bases")]);
   const normalize = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
-  const lines = stockLines(input).map((line, index) => {
+  return stockLines(input).map((line, index) => {
     const aliases = new Set(STOCK_FIELDS[index].aliases.map(normalize));
     const matches = (line.section === "prep" ? bases : items).filter((row) => aliases.has(normalize(row.name)));
     const reference = matches.length === 1 ? matches[0].id : null;
     return { field_key: line.key, section: line.section, name: line.name, uom: line.uom, note: line.note, quantity: line.quantity, needs_restock: line.needsRestock,
       item_id: line.section === "prep" ? null : reference, base_id: line.section === "prep" ? reference : null };
   });
+}
+export async function saveAutomaticStockOpname(input: StockEntryInput, submittedBy: string): Promise<{ id: string; replayed: boolean }> {
+  const lines = await submissionLines(input);
+  const { data, error } = await getSupabaseAdmin().rpc("submit_stock_opname_now", { p_id: input.id, p_store: input.storeId, p_counter: input.countedBy, p_submitted_by: submittedBy, p_lines: lines });
+  if (error) databaseError(error);
+  return data as { id: string; replayed: boolean };
+}
+export async function saveStockOpname(input: StockOpnameInput, submittedBy: string): Promise<{ id: string; replayed: boolean }> {
+  const lines = await submissionLines(input);
   const { data, error } = await getSupabaseAdmin().rpc(input.countedAt ? "submit_stock_opname_at" : "submit_stock_opname", { p_id: input.id, p_store: input.storeId, p_date: input.countDate, p_counter: input.countedBy, p_submitted_by: submittedBy, p_lines: lines, ...(input.countedAt ? { p_counted_at: input.countedAt } : {}) });
   if (error) databaseError(error);
   return data as { id: string; replayed: boolean };
