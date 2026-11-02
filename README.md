@@ -32,6 +32,14 @@ EventBridge itself has one-minute precision. The scheduled Lambda remains active
 - Dashboard login with a bootstrap super-admin and managed admin accounts
 - Demo dashboard data until Supabase is configured
 
+### Dashboard reporting convention
+
+Sales reporting uses each store's local **06:00 through 05:59 the next morning** as one business day. Dashboard totals, hourly charts, heatmaps and transaction-history date filters share this window. POS ingestion retains its existing calendar-date storage and sync schedule; no historical transaction rewrite is needed.
+
+Live/daily KPI deltas compare with the **previous seven complete business days' average**. For the current day, each comparison day is cut at the same elapsed time, including after midnight. AOV is total gross item sales divided by transaction count over those matching windows, not an average of daily AOVs. Orange shows the selected day, blue the seven-day hourly average, and gold one real highest-sales completed day before the selected period. Monthly reporting compares with the previous month and the best earlier month in the available stored history. Missing baselines remain unavailable. Historical chart benchmarks are cached for five minutes; live KPI baselines refresh once a minute, independently of live sales polling.
+
+Dashboard, Catalogue, Inventory, Settings and Transactions share the compact header/sidebar. The public `/staff/stock-opname` and `/staff/receiving` forms remain isolated.
+
 ## 1. Supabase setup
 
 1. Create a project at [database.new](https://database.new).

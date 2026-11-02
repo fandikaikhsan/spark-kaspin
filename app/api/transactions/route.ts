@@ -1,7 +1,8 @@
+import { businessClock } from "@/lib/analytics/dashboard";
 import { NextRequest } from "next/server";
 import { demoTransactionPage } from "@/lib/analytics/demo";
 import { hasSupabaseConfig } from "@/lib/env";
-import { businessDateForTimeZone, listStores } from "@/lib/stores";
+import { listStores } from "@/lib/stores";
 import { getTransactionsPage } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const parameters = request.nextUrl.searchParams;
   if (!hasSupabaseConfig()) {
-    const date = parameters.get("date") || businessDateForTimeZone("Asia/Jakarta");
+    const date = parameters.get("date") || businessClock("Asia/Jakarta").date;
     return Response.json(demoTransactionPage(date), { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       : stores[0];
     if (!store) return Response.json({ error: "No matching active store was found" }, { status: 404 });
 
-    const date = parameters.get("date") || businessDateForTimeZone(store.timeZone);
+    const date = parameters.get("date") || businessClock(store.timeZone).date;
     const page = Number(parameters.get("page") || "1");
     const pageSize = Number(parameters.get("pageSize") || "20");
     if (!Number.isInteger(page) || page < 1) {

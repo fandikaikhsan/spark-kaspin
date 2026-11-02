@@ -84,4 +84,10 @@ export type DashboardReport = {
   comparisonStart: string;
   comparisonEnd: string;
   comparisonThrough: string | null;
+  benchmarks: {
+    average: (number | null)[];
+    averageLabel: string;
+    best: (number | null)[];
+    bestDate: string | null;
+  };
 };

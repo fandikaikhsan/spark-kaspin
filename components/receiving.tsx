@@ -1,7 +1,5 @@
 "use client";
-import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { LogoutButton } from "@/components/logout-button";
 import { ReceivingItemPicker } from "@/components/receiving-item-picker";
 import { EMPLOYEE_NAMES } from "@/lib/operations/employees";
 import { parseReceiving, receivingUnits, type Receiving, type ReceivingItem } from "@/lib/receiving/model";
@@ -55,15 +53,15 @@ export function ReceivingPage({ stores, items, initialReceivings, initialError, 
     finally { inFlight.current = false; setBusy(false); }
   }
   function reset() { setReceivedBy(""); setLines([{ key: nextKey.current++, itemId: "", quantity: "", uom: "" }]); token.current = null; setSavedId(null); setError(null); }
-  return <div className={common.backdrop}><main className={`shell ${common.shell} ${styles.page} ${employeeMode ? common.employee : ""}`}>
+  return <div className={`${common.backdrop} ${employeeMode ? "" : common.management}`}><main className={`shell ${common.shell} ${styles.page} ${employeeMode ? common.employee : ""}`}>
     <header className={`subpage-header ${common.header}`}><div><h1>Receiving</h1></div>
-      {!employeeMode && <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><LogoutButton /></nav>}
+
     </header>
     {!stores.length && <p className="error" role="alert">Toko belum tersedia. Hubungi pengelola toko atau muat ulang halaman.</p>}
     <form onSubmit={(event) => void submit(event)} aria-label="Form receiving">
       <fieldset className={common.fieldset} disabled={busy || Boolean(savedId) || !stores.length || !items.length}>
         <div className={`${common.meta} ${styles.meta}`}>
-          <label><span>Toko *</span><select aria-label="Toko" required value={storeId} onChange={(event) => { setStoreId(event.target.value); setReceivings([]); if (!employeeMode) void refreshHistory(event.target.value); }}><option value="" disabled>Pilih toko</option>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}</option>)}</select></label>
+          <label><span>Toko *</span><select aria-label="Toko" required value={storeId} onChange={(event) => { setStoreId(event.target.value); if (!employeeMode) { const url = new URL(window.location.href); url.searchParams.set("store", event.target.value); window.history.replaceState(null, "", url); } setReceivings([]); if (!employeeMode) void refreshHistory(event.target.value); }}><option value="" disabled>Pilih toko</option>{stores.map((store) => <option value={store.id} key={store.id}>{store.name}</option>)}</select></label>
           <label><span>Nama penerima *</span><select aria-label="Nama penerima" required value={receivedBy} onChange={(event) => setReceivedBy(event.target.value)}><option value="" disabled>Pilih nama</option>{EMPLOYEE_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
           <p className={styles.timeNote}>Tanggal dan waktu dicatat otomatis saat Selesai.</p>
         </div>

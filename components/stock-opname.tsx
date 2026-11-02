@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { LogoutButton } from "@/components/logout-button";
 import type { Store } from "@/lib/stores";
 import { COUNTERS, RESTOCK_INSTRUCTION, STOCK_FIELDS, type StockSection } from "@/lib/stock-opname/template";
 import { parseStockEntry, type StockOpname } from "@/lib/stock-opname/model";
@@ -77,10 +75,10 @@ export function StockOpnamePage({ stores, initialSubmissions, initialError, init
   }
   function reset() { setAnswers({}); setCountedBy(""); setCountDate(today(stores.find((store) => store.id === storeId))); token.current = null; setSavedId(null); setError(null); }
 
-  return <div className={styles.backdrop}><main className={`shell ${styles.shell} ${employeeMode ? styles.employee : ""}`}>
+  return <div className={`${styles.backdrop} ${employeeMode ? "" : styles.management}`}><main className={`shell ${styles.shell} ${employeeMode ? styles.employee : ""}`}>
     <div className={styles.progress} role="progressbar" aria-label="Kelengkapan stock opname" aria-valuenow={completed} aria-valuemin={0} aria-valuemax={STOCK_FIELDS.length} aria-valuetext={`${completed} dari ${STOCK_FIELDS.length} barang terisi`}><span style={{ width: `${completed / STOCK_FIELDS.length * 100}%` }} /></div>
     <header className={`subpage-header ${styles.header}`}><div><h1>Stock opname</h1></div>
-      {!employeeMode && <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/receiving">Receiving</Link><LogoutButton /></nav>}
+
     </header>
     {!stores.length && <p className="error" role="alert">Toko belum tersedia. Hubungi pengelola toko atau muat ulang halaman.</p>}
     <form onSubmit={(event) => void submit(event)} aria-label="Form stock opname" className={styles.form}>

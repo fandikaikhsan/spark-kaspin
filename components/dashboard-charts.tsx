@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { TransactionReceipt } from "@/lib/analytics/types";
+import { BUSINESS_HOURS } from "@/lib/analytics/dashboard";
 import type { ProductSales } from "@/lib/analytics/dashboard";
 import styles from "./dashboard.module.css";
 
@@ -10,18 +11,19 @@ const currency = new Intl.NumberFormat("id-ID", { style: "currency", currency: "
 export const money = (value: number) => currency.format(value);
 export const shortMoney = (value: number) => value >= 1_000_000 ? `Rp${number.format(value / 1_000_000)} jt` : value >= 1000 ? `Rp${number.format(value / 1000)} rb` : money(value);
 export const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
-export const hours = Array.from({ length: 24 }, (_, index) => index);
+export const hours = BUSINESS_HOURS;
 export const dateLabel = (date: string, options?: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", options || { day: "numeric", month: "short" }).format(new Date(`${date}T12:00:00Z`));
 
-type IconName = "chart" | "boxes" | "cart" | "book" | "settings" | "logout" | "pin" | "refresh" | "package" | "receipt" | "wallet";
+type IconName = "chart" | "boxes" | "cart" | "book" | "settings" | "logout" | "pin" | "refresh" | "package" | "receipt" | "wallet" | "plus";
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
     chart: <path d="M4 4v16h16M7 14l4-5 4 3 5-7" />,
-    boxes: <path d="m12 2 5 3-5 3-5-3 5-3ZM7 12l5 3-5 3-5-3 5-3Zm10 0 5 3-5 3-5-3 5-3ZM7 5v5m10-5v5M2 15v5l5 3 5-3v-5m0 0v5l5 3 5-3v-5M7 18v5m10-5v5" />,
+    boxes: <><path d="m12 3 9 5v9l-9 5-9-5V8l9-5ZM3 8l9 5 9-5M12 13v9" /><path d="m7.5 5.5 9 5v4l-3 1.7v-4l-9-5" /></>,
     cart: <><path d="M3 4h2l2.5 11H19l2-8H6" /><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></>,
     book: <path d="M12 6v15M3 4c4-1 6 0 9 2 3-2 5-3 9-2v15c-4-1-6 0-9 2-3-2-5-3-9-2V4Z" />,
-    settings: <><path d="m10 3-1 3-3 1-3-1-1 4 3 2 1 3-1 3 4 2 2-3h3l2 3 4-2-1-3 1-3 3-2-1-4-3 1-3-1-1-3h-5Z" /><circle cx="12" cy="11" r="3" /></>,
-    logout: <path d="M10 4H4v16h6m4-12 4 4-4 4m-5-4h12" />,
+    settings: <><path d="m9.5 3-.6 2.2-1.5.9-2.2-.6-2.5 4.3 1.6 1.6v1.8l-1.6 1.6 2.5 4.3 2.2-.6 1.5.9.6 2.2h5l.6-2.2 1.5-.9 2.2.6 2.5-4.3-1.6-1.6v-1.8l1.6-1.6-2.5-4.3-2.2.6-1.5-.9-.6-2.2h-5Z" /><circle cx="12" cy="12" r="3" /></>,
+    logout: <><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10" /></>,
+    plus: <path d="M12 5v14M5 12h14" />,
     pin: <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2" /></>,
     refresh: <path d="M20 8V3l-3 3a8 8 0 1 0 2 10M20 3h-5" />,
     package: <path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10M7 5l9 5" />,
@@ -39,8 +41,8 @@ export function Delta({ value, label }: { value: number | null; label: string })
   </span><span>{value === null ? "No prior-period data" : label}</span></div>;
 }
 
-export function SalesChart({ values, labels, amount = true, lineAverage, partialIndex, futureAfter, compact = false, quantityLabel = "units" }: {
-  values: number[]; labels: string[]; amount?: boolean; lineAverage?: (number | null)[];
+export function SalesChart({ values, labels, amount = true, lineAverage, bestValues, averageLabel = "7-day average", partialIndex, futureAfter, compact = false, quantityLabel = "units" }: {
+  values: number[]; labels: string[]; amount?: boolean; lineAverage?: (number | null)[]; bestValues?: (number | null)[]; averageLabel?: string;
   partialIndex?: number; futureAfter?: number; compact?: boolean; quantityLabel?: string;
 }) {
   const holder = useRef<HTMLDivElement>(null);
@@ -53,27 +55,29 @@ export function SalesChart({ values, labels, amount = true, lineAverage, partial
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const height = compact ? 156 : 186;
+  const height = compact ? 156 : 250;
   const left = amount ? 58 : 36, right = 12, top = 16, bottom = 27;
   const pw = width - left - right, ph = height - top - bottom;
-  const max = Math.max(1, ...values, ...(lineAverage || []).filter((value): value is number => value !== null));
+  const max = Math.max(1, ...values, ...(lineAverage || []).filter((value): value is number => value !== null), ...(bestValues || []).filter((value): value is number => value !== null));
   const power = 10 ** Math.floor(Math.log10(max));
-  const ceiling = Math.ceil(max / power / 2) * power * 2;
+  const ceiling = Math.ceil(max / (power / 2)) * (power / 2);
   const x = (index: number) => left + (index + .5) * pw / Math.max(1, values.length);
   const y = (value: number) => top + ph - (value / ceiling) * ph;
   const last = futureAfter === undefined ? values.length - 1 : Math.min(futureAfter, values.length - 1);
   const path = values.slice(0, last + 1).map((value, index) => `${index ? "L" : "M"}${x(index)},${y(value)}`).join(" ");
-  const averagePath = (lineAverage || []).map((value, index, all) => value === null ? "" : `${index === 0 || all[index - 1] === null ? "M" : "L"}${x(index)},${y(value)}`).join(" ");
-  const ticks = width < 400 ? [0, Math.floor((values.length - 1) / 2), values.length - 1] : [0, Math.floor((values.length - 1) / 3), Math.floor((values.length - 1) * 2 / 3), values.length - 1];
-  const gradientId = `sales-${amount ? "money" : "units"}-${compact ? "compact" : "main"}`;
+  const curve = (points: (number | null)[]) => points.map((value, index, all) => value === null ? "" : `${index === 0 || all[index - 1] === null ? "M" : "L"}${x(index)},${y(value)}`).join(" ");
+  const averagePath = curve(lineAverage || []), bestPath = curve(bestValues || []);
+  const ticks = labels[0]?.includes(":") && width >= 500 ? [0,3,6,9,12,15,18,21,23] : width < 400 ? [0, Math.floor((values.length - 1) / 2), values.length - 1] : [0, Math.floor((values.length - 1) / 3), Math.floor((values.length - 1) * 2 / 3), values.length - 1];
+  const gradientId = useId();
   const hovering = hover !== null && hover < values.length ? hover : null;
   return <div ref={holder} className={styles.chart}>
-    {hovering !== null && <div className={styles.chartTooltip} role="status"><b>{labels[hovering]}</b><span>{futureAfter !== undefined && hovering > futureAfter ? "Not yet occurred" : amount ? money(values[hovering]) : `${number.format(values[hovering])} ${quantityLabel}`}{partialIndex === hovering ? " · partial" : ""}</span></div>}
+    {hovering !== null && <div className={styles.chartTooltip} role="status"><b>{labels[hovering]}</b><span>{futureAfter !== undefined && hovering > futureAfter ? "Not yet occurred" : amount ? money(values[hovering]) : `${number.format(values[hovering])} ${quantityLabel}`}{partialIndex === hovering ? " · partial" : ""}</span>{lineAverage?.[hovering] != null && <span>{averageLabel}: {amount ? money(lineAverage[hovering]!) : number.format(lineAverage[hovering]!)}</span>}{bestValues?.[hovering] != null && <span>Best: {amount ? money(bestValues[hovering]!) : number.format(bestValues[hovering]!)}</span>}</div>}
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${amount ? "Gross sales" : quantityLabel} by ${labels[0]?.includes(":") ? "hour" : "day"}${partialIndex !== undefined ? "; current interval is partial" : ""}`} onMouseLeave={() => setHover(null)}>
       <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#b64b20" stopOpacity=".23" /><stop offset="100%" stopColor="#b64b20" stopOpacity=".015" /></linearGradient></defs>
       {[0, .5, 1].map((fraction) => <g key={fraction}><line x1={left} x2={width - right} y1={y(ceiling * fraction)} y2={y(ceiling * fraction)} className={styles.chartGrid} /><text x={left - 8} y={y(ceiling * fraction) + 4} textAnchor="end">{amount ? shortMoney(ceiling * fraction) : number.format(ceiling * fraction)}</text></g>)}
       {futureAfter !== undefined && futureAfter < values.length - 1 && <rect x={x(futureAfter + 1) - pw / values.length / 2} y={top} width={(values.length - futureAfter - 1) * pw / values.length} height={ph} fill="#ede6df" opacity=".5" />}
       {values.length > 0 && <><path d={`${path} L${x(last)},${y(0)} L${x(0)},${y(0)} Z`} fill={`url(#${gradientId})`} /><path d={path} className={styles.salesLine} />
+        {bestPath && <path d={bestPath} className={styles.bestLine} />}
         {averagePath && <path d={averagePath} className={styles.averageLine} />}
         {partialIndex !== undefined && partialIndex <= last && <><line x1={x(partialIndex)} x2={x(partialIndex)} y1={top} y2={y(0)} className={styles.partialLine} /><circle cx={x(partialIndex)} cy={y(values[partialIndex])} r="3.5" fill="#b64b20" /></>}
       </>}
@@ -84,7 +88,7 @@ export function SalesChart({ values, labels, amount = true, lineAverage, partial
 }
 
 export function ProductMix({ products }: { products: ProductSales[] }) {
-  const palette = ["#b64b20", "#174f3c", "#e8a77c", "#8eafa0", "#e9e5df"];
+  const palette = ["#bf3e1c", "#e8ae28", "#174f3c", "#edb498", "#d9dcdf"];
   const positive = products.filter((product) => product.revenue > 0);
   const total = sum(positive.map((product) => product.revenue));
   const top = positive.slice(0, 4).map((product) => ({ name: product.name, revenue: product.revenue }));

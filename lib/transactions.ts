@@ -1,3 +1,4 @@
+import { businessClock, businessWindow } from "./analytics/dashboard";
 import { summarizeStore, type Store } from "@/lib/stores";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -73,6 +74,7 @@ export async function getTransactionsPage(
   const page = Math.max(1, Math.floor(requestedPage));
   const from = (page - 1) * pageSize;
 
+  const window = businessWindow(date, date, store.utcOffset);
   const { data, error, count } = await getSupabaseAdmin()
     .from("pos_transactions")
     .select(
@@ -80,7 +82,7 @@ export async function getTransactionsPage(
       { count: "exact" },
     )
     .eq("store_id", store.id)
-    .eq("business_date", date)
+    .gte("occurred_at", window.from).lt("occurred_at", window.until)
     .order("occurred_at", { ascending: false })
     .order("transaction_code", { ascending: false })
     .range(from, from + pageSize - 1);
@@ -94,7 +96,7 @@ export async function getTransactionsPage(
   const transactions: TransactionReceipt[] = rows.map((row) => ({
     transactionCode: row.transaction_code,
     receiptNumber: Number(row.receipt_number),
-    businessDate: row.business_date,
+    businessDate: date,
     occurredAt: row.occurred_at,
     subtotal: Number(row.subtotal),
     grandTotal: Number(row.grand_total),
@@ -105,8 +107,8 @@ export async function getTransactionsPage(
 
   return {
     date,
-    store: summarizeStore(store),
-    stores: stores.map(summarizeStore),
+    store: { ...summarizeStore(store), businessDate: businessClock(store.timeZone).date },
+    stores: stores.map((store) => ({ ...summarizeStore(store), businessDate: businessClock(store.timeZone).date })),
     transactions,
     page,
     pageSize,

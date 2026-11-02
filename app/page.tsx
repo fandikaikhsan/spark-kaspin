@@ -1,8 +1,9 @@
+import { businessClock } from "@/lib/analytics/dashboard";
 import { Dashboard } from "@/components/dashboard";
 import { demoAnalytics } from "@/lib/analytics/demo";
 import { getDailyAnalytics } from "@/lib/analytics/service";
 import { hasSupabaseConfig } from "@/lib/env";
-import { businessDateForTimeZone, listStores } from "@/lib/stores";
+import { listStores } from "@/lib/stores";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 import { isBusinessDate } from "@/lib/analytics/dashboard";
@@ -16,7 +17,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const user = session ? { username: session.username, role: session.role } : undefined;
   const mode: DashboardMode = parameters.view === "monthly" || parameters.view === "daily" ? parameters.view : "live";
   if (!hasSupabaseConfig()) {
-    const today = businessDateForTimeZone("Asia/Jakarta");
+    const today = businessClock("Asia/Jakarta").date;
     const date = mode !== "live" && parameters.date && isBusinessDate(parameters.date) && parameters.date <= today ? parameters.date : today;
     return <Dashboard initialData={demoAnalytics(date)} initialMode={mode} initialNow={Date.now()} user={user} />;
   }
@@ -24,7 +25,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const stores = await listStores(true);
   if (!stores.length) throw new Error("No active stores are configured. Open /settings to add one.");
   const store = stores.find((store) => store.id === parameters.store) || stores[0];
-  const today = businessDateForTimeZone(store.timeZone);
+  const today = businessClock(store.timeZone).date;
   const date = mode !== "live" && parameters.date && isBusinessDate(parameters.date) && parameters.date <= today ? parameters.date : today;
   const initialData = await getDailyAnalytics(store, date, stores);
 

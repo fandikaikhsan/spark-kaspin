@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
-import { LogoutButton } from "@/components/logout-button";
 import { UserManagement } from "@/components/user-management";
 import type { StoreAdminSummary } from "@/lib/store-settings";
 import type { ManagedUser } from "@/lib/users";
@@ -157,21 +155,7 @@ export function StoreSettings({
   const [stores, setStores] = useState(initialStores);
   return (
     <main className="shell settings-shell">
-      <header className="settings-header">
-        <div>
-          <p className="eyebrow">Spark Intelligence · Administration</p>
-          <h1>Store settings</h1>
-          <p className="subtitle">
-            Configure branch timezones and seed credentials. Token values are never displayed again.
-          </p>
-        </div>
-        <nav className="header-actions" aria-label="Account and navigation">
-          <Link className="back-link" href="/items">Items</Link>
-          <Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><Link className="back-link" href="/receiving">Receiving</Link>
-          <Link className="back-link" href="/">Back to dashboard</Link>
-          <LogoutButton />
-        </nav>
-      </header>
+      <header className="settings-header"><div><p className="eyebrow">Administration</p><h1>Settings</h1></div></header>
 
       <div className="settings-stack">
         {stores.map((store) => (

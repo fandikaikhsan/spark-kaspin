@@ -83,3 +83,7 @@
   .actions button { max-width:none; width:100%; font-size:16px; }
 }
 @media(prefers-reduced-motion:reduce) { .progress span { transition:none; } }
+
+.management { background: transparent; min-height: 0; }
+.management .shell { --ink:#202428; --muted:#727981; --line:#e4e7eb; --paper:#f6f7f9; --orange:#bf3e1c; }
+.management .progress { top:62px; height:3px; }

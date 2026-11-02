@@ -40,12 +40,32 @@ export function localClock(timeZone: string, now = new Date()) {
   };
 }
 
+// POS ingestion retains calendar dates. Reporting alone uses a 06:00 boundary.
+export const BUSINESS_HOURS = Array.from({ length: 24 }, (_, index) => (index + 6) % 24);
+export const businessHourIndex = (hour: number) => (hour + 18) % 24;
+export const reportingDate = (calendarDate: string, hour: number) => hour < 6 ? addDays(calendarDate, -1) : calendarDate;
+export function businessClock(timeZone: string, now = new Date()) {
+  const clock = localClock(timeZone, now);
+  return { ...clock, date: reportingDate(clock.date, clock.hour), hourIndex: businessHourIndex(clock.hour) };
+}
+export function businessWindow(start: string, end: string, utcOffset: string) {
+  return { from: `${start}T06:00:00${utcOffset}`, until: `${addDays(end, 1)}T06:00:00${utcOffset}` };
+}
+export function businessSeconds(time: string) {
+  const [hour, minute, second] = time.split(":").map(Number);
+  return businessHourIndex(hour) * 3600 + minute * 60 + second;
+}
+export function withinBusinessTime(occurredAt: string, date: string, offset: string, time: string) {
+  const elapsed = Date.parse(occurredAt) - Date.parse(businessWindow(date, date, offset).from);
+  return elapsed >= 0 && elapsed <= businessSeconds(time) * 1000;
+}
+
 export function reportingPeriod(mode: DashboardMode, date: string, today: string) {
   if (!isBusinessDate(date)) throw new Error("Date must be a valid YYYY-MM-DD date");
   if (date > today) throw new Error("Choose today or an earlier date");
   if (mode !== "monthly") {
     const previous = addDays(date, -7);
-    return { start: date, end: date, comparisonStart: previous, comparisonEnd: previous };
+    return { start: date, end: date, comparisonStart: previous, comparisonEnd: addDays(date, -1) };
   }
   const start = `${date.slice(0, 7)}-01`;
   const next = new Date(`${start}T12:00:00Z`);

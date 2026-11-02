@@ -3,38 +3,9 @@ import { summarizeStore, type Store } from "@/lib/stores";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getRecentTransactions } from "@/lib/transactions";
 import { summarizeHourlyItems } from "./aggregate";
-import type { DailyAnalytics, HourlyItemSale } from "./types";
-
-type HourlyViewRow = {
-  item_code: string;
-  item_name: string;
-  category: string;
-  business_hour: number;
-  quantity: number;
-  revenue: number;
-};
-
-async function loadAllHourlyRows(storeId: string, date: string): Promise<HourlyViewRow[]> {
-  const supabase = getSupabaseAdmin();
-  const pageSize = 1_000;
-  const rows: HourlyViewRow[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("pos_hourly_item_sales")
-      .select("item_code,item_name,category,business_hour,quantity,revenue")
-      .eq("store_id", storeId)
-      .eq("business_date", date)
-      .order("item_code", { ascending: true })
-      .order("business_hour", { ascending: true })
-      .range(from, from + pageSize - 1);
-
-    if (error) throw new Error(`Could not load hourly sales: ${error.message}`);
-    const page = (data || []) as HourlyViewRow[];
-    rows.push(...page);
-    if (page.length < pageSize) return rows;
-  }
-}
+import { businessWindow } from "./dashboard";
+import { loadHours } from "./sales-data";
+import type { DailyAnalytics } from "./types";
 
 export async function getDailyAnalytics(
   store: Store,
@@ -44,18 +15,19 @@ export async function getDailyAnalytics(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Date must use YYYY-MM-DD");
   const supabase = getSupabaseAdmin();
 
-  const [hourlyRows, transactionsResult, syncResult, recentTransactions] = await Promise.all([
-    loadAllHourlyRows(store.id, date),
+  const window = businessWindow(date, date, store.utcOffset);
+  const [hourlyItems, transactionsResult, syncResult, recentTransactions] = await Promise.all([
+    loadHours(store.id, date, date),
     supabase
       .from("pos_transactions")
       .select("transaction_code", { count: "exact", head: true })
       .eq("store_id", store.id)
-      .eq("business_date", date),
+      .gte("occurred_at", window.from).lt("occurred_at", window.until),
     supabase
       .from("sync_runs")
       .select("completed_at")
       .eq("store_id", store.id)
-      .eq("business_date", date)
+      .gte("business_date", date).lte("business_date", window.until.slice(0, 10))
       .eq("status", "success")
       .order("completed_at", { ascending: false })
       .limit(1)
@@ -66,16 +38,6 @@ export async function getDailyAnalytics(
   if (transactionsResult.error) throw new Error(`Could not count transactions: ${transactionsResult.error.message}`);
   if (syncResult.error) throw new Error(`Could not load sync status: ${syncResult.error.message}`);
 
-  const hourlyItems: HourlyItemSale[] = hourlyRows.map(
-    (row) => ({
-      itemCode: row.item_code,
-      itemName: row.item_name,
-      category: row.category,
-      hour: Number(row.business_hour),
-      quantity: Number(row.quantity),
-      revenue: Number(row.revenue),
-    }),
-  );
   const totals = summarizeHourlyItems(hourlyItems);
 
   return {

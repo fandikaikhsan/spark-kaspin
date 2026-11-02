@@ -1,14 +1,15 @@
+import { businessClock } from "@/lib/analytics/dashboard";
 import { NextRequest } from "next/server";
 import { demoAnalytics } from "@/lib/analytics/demo";
 import { getDailyAnalytics } from "@/lib/analytics/service";
 import { hasSupabaseConfig } from "@/lib/env";
-import { businessDateForTimeZone, listStores } from "@/lib/stores";
+import { listStores } from "@/lib/stores";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   if (!hasSupabaseConfig()) {
-    const date = request.nextUrl.searchParams.get("date") || businessDateForTimeZone("Asia/Jakarta");
+    const date = request.nextUrl.searchParams.get("date") || businessClock("Asia/Jakarta").date;
     return Response.json(demoAnalytics(date), { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     : stores[0];
   if (!store) return Response.json({ error: "No matching active store was found" }, { status: 404 });
 
-  const date = request.nextUrl.searchParams.get("date") || businessDateForTimeZone(store.timeZone);
+  const date = request.nextUrl.searchParams.get("date") || businessClock(store.timeZone).date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return Response.json({ error: "date must use YYYY-MM-DD" }, { status: 400 });
   }

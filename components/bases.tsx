@@ -1,7 +1,8 @@
 "use client";
+
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { LogoutButton } from "@/components/logout-button";
+import { Icon } from "./dashboard-charts";
 import { BaseIngredientPicker } from "@/components/base-ingredient-picker";
 import { OUTPUT_UNITS, OUTPUT_LABELS, baseCost, ingredientUnits, parseBaseInput, type BaseInput, type OutputUnit, type PreparedBase } from "@/lib/bases/model";
 import type { Item } from "@/lib/items/model";
@@ -99,9 +100,9 @@ export function Bases({ initialBases, initialItems, initialError, startCreating 
   }
   const disabled = loading || mutating || editor !== null || !available;
   return <main className={`shell engineering-shell ${styles.shell}`}>
-    <header className="subpage-header"><div><p className="eyebrow">Spark Intelligence · Catalog & recipes</p><h1>Bases</h1><p className="subtitle">Prepared stock and its recipes, shared across all stores.</p></div><nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/items">Items</Link><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><Link className="back-link" href="/receiving">Receiving</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
+    <header className="subpage-header"><div><p className="eyebrow">Catalogue</p><h1>Bases</h1></div></header>
     {error && <div className="error" role="alert">{error}</div>}{message && <div className="notice" role="status">{message}</div>}
-    <div className="engineering-toolbar"><label><span>Search bases</span><input type="search" placeholder="Search by name or ID" value={search} onChange={(event) => setSearch(event.target.value)} /></label><div className="engineering-toolbar-actions"><button className="engineering-secondary" type="button" disabled={loading || mutating || editor !== null} onClick={() => { setMessage(null); void refresh(); }}>{loading ? "Refreshing…" : "Refresh"}</button><button className="engineering-primary" type="button" disabled={disabled} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>Create base</button></div></div>
+    <div className="engineering-toolbar"><label><span>Search bases</span><input type="search" placeholder="Search by name or ID" value={search} onChange={(event) => setSearch(event.target.value)} /></label><div className="engineering-toolbar-actions"><button className="engineering-secondary" type="button" disabled={loading || mutating || editor !== null} aria-label="Refresh bases" title="Refresh bases" onClick={() => { setMessage(null); void refresh(); }}><Icon name="refresh" /></button><button className="engineering-primary" type="button" disabled={disabled} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }} aria-label="Create base" title="Create base"><Icon name="plus" /></button></div></div>
     {editor !== null && <BaseForm key={editor === "new" ? "new" : editor.id} existing={editor === "new" ? null : editor} items={items} busy={mutating} onCancel={() => setEditor(null)} onSave={save} />}
     <section aria-label="Base catalog" aria-busy={loading}><p className={styles.count}>{visible.length === bases.length ? `${bases.length} ${bases.length === 1 ? "base" : "bases"}` : `${visible.length} of ${bases.length} bases`}</p>
       <div className="engineering-table-wrap"><table className={`engineering-table ${styles.table}`}><thead><tr>{["Base / ID", "Batch yield", "Ingredients", "Production cost", "Cost per unit", "Updated (WITA)", "Actions"].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>

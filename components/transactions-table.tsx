@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogoutButton } from "@/components/logout-button";
 import type { TransactionPage } from "@/lib/analytics/types";
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
@@ -61,19 +59,7 @@ export function TransactionsTable({ initialData }: { initialData: TransactionPag
 
   return (
     <main className="shell transactions-shell">
-      <header className="subpage-header">
-        <div>
-          <p className="eyebrow">Spark Intelligence</p>
-          <h1>Transactions</h1>
-          <p className="subtitle">Every receipt recorded for the selected business day.</p>
-        </div>
-        <nav className="header-actions" aria-label="Account and navigation">
-          <Link className="back-link" href="/items">Items</Link>
-          <Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><Link className="back-link" href="/receiving">Receiving</Link>
-          <Link className="back-link" href="/">Back to dashboard</Link>
-          <LogoutButton />
-        </nav>
-      </header>
+      <header className="subpage-header"><div><p className="eyebrow">Dashboard</p><h1>Transactions</h1></div></header>
 
       <section className="transaction-filters" aria-label="Transaction filters">
         <label>

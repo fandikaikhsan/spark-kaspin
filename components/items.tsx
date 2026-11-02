@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import styles from "./items.module.css";
 import { useId, useMemo, useState, type FormEvent } from "react";
-import { LogoutButton } from "@/components/logout-button";
+import { Icon } from "./dashboard-charts";
 import { BASE_UNITS, BASE_UNIT_LABELS, itemCost, parseItemInput, standardConversion, type BaseUnit, type Item, type ItemInput } from "@/lib/items/model";
 
 const money = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 2 });
@@ -153,12 +152,11 @@ export function Items({ initialItems, initialError, startCreating = false }: { i
 
   const disabled = loading || mutating || editor !== null || !available;
   return <main className={`shell engineering-shell ${styles.shell}`}>
-    <header className="subpage-header"><div><p className="eyebrow">Spark Intelligence · Inventory</p><h1>Items</h1><p className="subtitle">Purchased stock and raw materials, shared across all stores.</p></div>
-      <nav className="header-actions" aria-label="Account and navigation"><Link className="back-link" href="/">Dashboard</Link><Link className="back-link" href="/bases">Bases</Link><Link className="back-link" href="/products">Products</Link><Link className="back-link" href="/stock-opname">Stock Opname</Link><Link className="back-link" href="/receiving">Receiving</Link><Link className="back-link" href="/settings">Settings</Link><LogoutButton /></nav></header>
+    <header className="subpage-header"><div><p className="eyebrow">Catalogue</p><h1>Items</h1></div></header>
     {error && <div className="error" role="alert">{error}</div>}
     {message && <div className="notice" role="status">{message}</div>}
     <div className="engineering-toolbar"><label><span>Search items</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or ID" /></label>
-      <div className="engineering-toolbar-actions"><button className="engineering-secondary" type="button" disabled={loading || mutating || editor !== null} onClick={() => { setMessage(null); void refresh(); }}>{loading ? "Refreshing…" : "Refresh"}</button><button className="engineering-primary" type="button" disabled={disabled} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }}>Create item</button></div></div>
+      <div className="engineering-toolbar-actions"><button className="engineering-secondary" type="button" disabled={loading || mutating || editor !== null} aria-label="Refresh items" title="Refresh items" onClick={() => { setMessage(null); void refresh(); }}><Icon name="refresh" /></button><button className="engineering-primary" type="button" disabled={disabled} onClick={() => { setEditor("new"); setDeleting(null); setMessage(null); setError(null); }} aria-label="Create item" title="Create item"><Icon name="plus" /></button></div></div>
     {editor !== null && <ItemForm key={editor === "new" ? "new" : editor.id} existing={editor === "new" ? null : editor} busy={mutating} onCancel={() => setEditor(null)} onSave={save} />}
     <section aria-label="Item catalog" aria-busy={loading}>
       <p className={styles.count}>{visible.length === items.length ? `${items.length} ${items.length === 1 ? "item" : "items"}` : `${visible.length} of ${items.length} items`}</p>
