@@ -28,10 +28,19 @@ describe("live seven-day KPI comparisons", () => {
     expect(averageOrderValue(report.comparison!)).toBe(1400);
     expect(report.comparisonThrough).toBe("00:30:00");
   });
+  it("includes completed hours from today in all-time peaks but excludes the current partial hour", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-02T04:30:00Z")); // 12:30 WITA.
+    const row = (date: string, hour: number, revenue: number) => ({ date, hour, revenue, quantity: 1, itemCode: "A", itemName: "A", category: "Food" });
+    vi.mocked(loadHours).mockResolvedValue([row("2026-11-01", 11, 100), row("2026-11-01", 12, 200), row("2026-11-02", 11, 300), row("2026-11-02", 12, 999)]);
+    vi.mocked(loadOrders).mockResolvedValue([]); vi.mocked(loadLines).mockResolvedValue([]);
+    const report = await getDashboardReport(store, "live", "2026-11-02");
+    expect(report.benchmarks.peak[5]).toBe(300); expect(report.benchmarks.peakDates[5]).toBe("2026-11-02");
+    expect(report.benchmarks.peak[6]).toBe(200); expect(report.benchmarks.peakDates[6]).toBe("2026-11-01");
+  });
   it("keeps an absent baseline unavailable instead of inventing a percentage", async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-02T04:00:00Z"));
     vi.mocked(loadHours).mockResolvedValue([]); vi.mocked(loadOrders).mockResolvedValue([]); vi.mocked(loadLines).mockResolvedValue([]);
     const report = await getDashboardReport(store, "live", "2026-11-02");
-    expect(report.comparison).toBeNull(); expect(report.benchmarks.average).toEqual([]); expect(report.benchmarks.bestDate).toBeNull();
+    expect(report.comparison).toBeNull(); expect(report.benchmarks.average).toEqual([]); expect(report.benchmarks.peakDates).toEqual(Array(24).fill(null));
   });
 });

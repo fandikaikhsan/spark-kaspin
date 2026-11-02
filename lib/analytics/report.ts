@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { type Store } from "@/lib/stores";
 import { demoAnalytics } from "./demo";
-import { addDays, businessClock, withinBusinessTime, dateRange, reportingPeriod } from "./dashboard";
+import { businessClock, businessHourIndex, withinBusinessTime, dateRange, reportingPeriod } from "./dashboard";
 import { salesBenchmarks } from "./benchmarks";
 import { loadHours, loadOrders, loadLines, type ReportOrder as Order, type ReportLine as Line } from "./sales-data";
 import type { DashboardMode, DashboardReport, DashboardTotals } from "./types";
@@ -36,7 +36,7 @@ export async function getDashboardReport(store: Store, mode: DashboardMode, date
     mode === "live" ? Promise.resolve([]) : loadHours(store.id, period.start, period.end),
     mode === "live" ? Promise.resolve([]) : loadOrders(store, period.start, period.end),
     loadOrders(store, period.comparisonStart, period.comparisonEnd),
-    historicalHours(store.id, addDays(clock.date, -1)),
+    historicalHours(store.id, clock.date),
   ]);
   const previousOrders = allPreviousOrders.filter((order) => {
     if (!partial) return true;
@@ -76,7 +76,8 @@ export async function getDashboardReport(store: Store, mode: DashboardMode, date
     date, mode, storeId: store.id, source: "supabase", startDate: period.start, endDate: period.end,
     hourlyItems, daily, baskets, weekdayHours, comparison,
     comparisonStart: period.comparisonStart, comparisonEnd: period.comparisonEnd, comparisonThrough,
-    benchmarks: salesBenchmarks(history, mode, period.start, period.end, period.comparisonStart, period.comparisonEnd),
+    benchmarks: salesBenchmarks(history.filter((row) => row.date < clock.date ||
+      mode !== "monthly" && businessHourIndex(row.hour) < clock.hourIndex), mode, period.start, period.end, period.comparisonStart, period.comparisonEnd),
   };
 }
 
@@ -90,6 +91,6 @@ export function demoDashboardReport(mode: DashboardMode, date: string): Dashboar
     daily: dateRange(period.start, period.end).map((day) => ({ date: day, revenue: day === date ? sample.totalRevenue : 0, units: day === date ? sample.totalUnits : 0, transactions: day === date ? sample.transactionCount : 0 })),
     baskets: ["1 item", "2 items", "3 items", "4 items", "5+ items"].map((label, index) => ({ label, count: index === 4 ? 1 : 0 })),
     weekdayHours: [], comparison: null, comparisonStart: period.comparisonStart, comparisonEnd: period.comparisonEnd, comparisonThrough: null,
-    benchmarks: { average: [], averageLabel: "Previous 7 days avg.", best: [], bestDate: null },
+    benchmarks: { average: [], averageLabel: "Previous 7 days avg.", peak: [], peakDates: [] },
   };
 }

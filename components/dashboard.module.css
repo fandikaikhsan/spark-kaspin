@@ -76,8 +76,8 @@
 .delta { color: #8b7d70; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; line-height: 1.4; }
 .deltaValue { display: inline-flex; align-items: center; gap: 5px; color: #39332e; font-weight: 650; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .up, .down { width: 0; height: 0; display: inline-block; border-left: 5px solid transparent; border-right: 5px solid transparent; }
-.up { border-bottom: 8px solid var(--brand-green); }
-.down { border-top: 8px solid #bf4d40; }
+.up { border-bottom: 8px solid #16c768; }
+.down { border-top: 8px solid #f03645; }
 .chartHeading { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a09182; }
 .chartHeading span:first-child { font-size: 12px; color: #6c5747; font-weight: 550; }
 .chart { position: relative; min-width: 0; width: 100%; margin-top: 6px; }
@@ -86,15 +86,29 @@
 .chartGrid { stroke: #e9ddd1; stroke-width: 1; }
 .salesLine { fill: none; stroke: var(--brand-orange); stroke-width: 2.5; stroke-linejoin: round; }
 .averageLine { fill: none; stroke: #4b92df; stroke-width: 2; stroke-linejoin: round; }
-.bestLine { fill: none; stroke: #dba520; stroke-width: 2; stroke-dasharray: 6 4; stroke-linejoin: round; }
+.peakLine { fill: none; stroke: #dba520; stroke-width: 2; stroke-dasharray: 6 4; stroke-linejoin: round; }
 .partialLine { stroke: var(--brand-orange); stroke-width: 1; stroke-dasharray: 2 3; opacity: .5; }
-.chartTooltip { flex-wrap: wrap; max-width: 100%; position: absolute; z-index: 3; top: 0; right: 0; pointer-events: none; border: 1px solid #e7d9cb; border-radius: 7px; background: #fffdf9; padding: 8px 10px; color: #4f4033; box-shadow: 0 3px 12px #5a402211; font-size: 11px; display: flex; gap: 10px; }
-.chartTooltip b { font-weight: 600; }
+.chartTooltip { position: fixed; z-index: 60; width: max-content; min-width: 172px; max-width: min(220px, calc(100vw - 16px)); pointer-events: none; border: 1px solid #dce1e6; border-radius: 7px; background: #fff; padding: 8px 10px; color: #30363b; box-shadow: 0 3px 14px #1723311c; font-size: 11px; line-height: 1.35; display: grid; gap: 5px; }
+.chartTooltip > b { font-weight: 650; padding-bottom: 3px; border-bottom: 1px solid #eef0f2; }
+.chartTooltip > small { color: #727981; font-size: 10px; line-height: 1.35; }
+.tooltipRow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tooltipRow > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.tooltipRow i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tooltipRow strong { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.hoverLine { stroke: #858e97; stroke-width: 1; stroke-dasharray: 3 3; }
+.liveDot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f03645; margin-right: 6px; vertical-align: 1px; flex-shrink: 0; }
+.pieContainer { position: relative; min-width: 0; }
+.pieContainer svg { display: block; overflow: visible; }
+.pieContainer path { cursor: pointer; transition: stroke-width 120ms ease; }
+.pieContainer path:focus { outline: none; }
+.pieContainer path:focus-visible { outline: none; stroke: #bf3e1c; stroke-width: 1.5; }
+.root button.mixRow { padding: 0; border: 0; background: transparent; width: 100%; text-align: left; border-radius: 4px; font-size: 12px; }
+button.mixRow:hover { background: #f6f7f9; }
 .chartLegend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 11px; color: #9b8c7d; margin-top: 7px; }
 .chartLegend > span { display: flex; align-items: center; gap: 5px; }
 .chartLegend i { display: inline-block; height: 3px; width: 14px; background: var(--brand-orange); }
 .chartLegend i.averageSwatch { height: 0; background: #4b92df; height: 3px; }
-.chartLegend i.bestSwatch { background: transparent; height: 0; border-top: 2px dashed #dba520; }
+.chartLegend i.peakSwatch { background: transparent; height: 0; border-top: 2px dashed #dba520; }
 .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .kpi { padding: 17px 16px; display: flex; flex-direction: column; min-height: 165px; }
 .kpi h2 { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 550; color: #7d746b; white-space: nowrap; }
@@ -211,3 +225,13 @@
 @media (min-width: 1061px) { .kpi h2 { flex-direction: row-reverse; justify-content: space-between; } .kpi h2 svg { color: #bf3e1c; } }
 @media (max-width: 620px) { .root :global(.subpage-header h1), .root :global(.settings-header h1) { font-size: 24px; } .sync { display: none; } .mix { grid-template-columns: minmax(105px, .8fr) minmax(0, 1.2fr); } .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; } .kpi { padding: 12px 9px; min-height: 150px; } .kpi h2 { white-space: normal; font-size: 11px; } .kpi h2 svg { display: none; } .kpi > strong { font-size: 32px; letter-spacing: -1px; } .aov { display: flex; grid-column: auto; } .aov > strong { font-size: 20px; margin: 16px 0 10px; letter-spacing: -.7px; } .aov .delta { margin-top: auto; justify-items: start; text-align: left; } .kpi .delta { font-size: 10px; } .kpi .deltaValue { font-size: 14px; } }
 @media (max-height: 600px) and (min-width: 621px) { .sidebar { gap: 6px; padding-top: 10px; padding-bottom: 10px; min-height: 290px; } .navButton { width: 40px; height: 40px; } .sidebarSpace { min-height: 0; } }
+
+@media (max-width: 620px) { .root button.mixRow { font-size: 11px; } }
+
+/* Let the plot occupy the stretched card instead of leaving blank space below it. */
+.hero { display: flex; flex-direction: column; }
+.chartFill { flex: 1; min-height: 210px; }
+.chartFill > svg { position: absolute; inset: 0; height: 100%; }
+.hero .chartLegend { flex-shrink: 0; margin-top: 8px; }
+.mix { row-gap: 8px; }
+.mix .pie { margin-top: 6px; margin-bottom: 6px; }

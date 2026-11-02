@@ -87,7 +87,7 @@ export type DashboardReport = {
   benchmarks: {
     average: (number | null)[];
     averageLabel: string;
-    best: (number | null)[];
-    bestDate: string | null;
+    peak: (number | null)[];
+    peakDates: (string | null)[];
   };
 };

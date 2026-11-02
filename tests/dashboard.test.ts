@@ -43,12 +43,26 @@ describe("06:00 reporting and comparison curves", () => {
     expect(withinBusinessTime("2026-10-21T00:30:01+08:00", "2026-10-20", "+08:00", "00:30:00")).toBe(false);
     expect(withinBusinessTime("2026-10-20T05:59:59+08:00", "2026-10-20", "+08:00", "18:00:00")).toBe(false);
   });
-  it("uses one real best day and divides hourly totals by seven, not the number of sales rows", () => {
+  it("takes each hour's all-time peak from its own date and keeps the seven-day average separate", () => {
     const row = (date: string, hour: number, revenue: number) => ({ date, hour, revenue, quantity: 1, itemCode: "A", itemName: "A", category: "Food" });
     const result = salesBenchmarks([row("2026-10-01", 6, 100), row("2026-10-01", 7, 5), row("2026-10-02", 6, 1), row("2026-10-02", 7, 90), row("2026-10-17", 0, 70), row("2026-10-24", 6, 999)], "live", "2026-10-24", "2026-10-24", "2026-10-17", "2026-10-23");
-    expect(result.bestDate).toBe("2026-10-01"); expect(result.best.slice(0, 2)).toEqual([100, 5]);
+    expect(result.peak.slice(0, 2)).toEqual([999, 90]);
+    expect(result.peakDates.slice(0, 2)).toEqual(["2026-10-24", "2026-10-02"]);
     expect(result.average[18]).toBe(10); expect(result.average[0]).toBe(0);
-    expect(salesBenchmarks([], "live", "2026-10-24", "2026-10-24", "2026-10-17", "2026-10-23").bestDate).toBeNull();
+    expect(salesBenchmarks([], "live", "2026-10-24", "2026-10-24", "2026-10-17", "2026-10-23").peakDates).toEqual(Array(24).fill(null));
+  });
+  it("sums products before comparing hourly peaks, uses deterministic ties, and leaves unobserved hours blank", () => {
+    const row = (date: string, hour: number, revenue: number, itemCode: string) => ({ date, hour, revenue, quantity: 1, itemCode, itemName: itemCode, category: "Food" });
+    const result = salesBenchmarks([row("2026-10-01", 6, 60, "A"), row("2026-10-01", 6, 60, "B"), row("2026-10-02", 6, 100, "A"), row("2026-10-03", 6, 120, "A"), row("2026-10-25", 0, 250, "A")], "daily", "2026-10-24", "2026-10-24", "2026-10-17", "2026-10-23");
+    expect(result.peak[0]).toBe(120); expect(result.peakDates[0]).toBe("2026-10-01");
+    expect(result.peak[18]).toBe(250); expect(result.peakDates[18]).toBe("2026-10-25");
+    expect(result.peak[1]).toBeNull(); expect(result.peakDates[1]).toBeNull();
+  });
+  it("uses the peak total for each day position across months", () => {
+    const row = (date: string, revenue: number) => ({ date, hour: 12, revenue, quantity: 1, itemCode: "A", itemName: "A", category: "Food" });
+    const result = salesBenchmarks([row("2026-01-01", 100), row("2026-02-01", 90), row("2026-01-02", 20), row("2026-02-02", 110)], "monthly", "2026-03-01", "2026-03-31", "2026-02-01", "2026-02-28");
+    expect(result.peak.slice(0, 2)).toEqual([100, 110]); expect(result.peakDates.slice(0, 2)).toEqual(["2026-01-01", "2026-02-02"]);
+    expect(result.peak[30]).toBeNull();
   });
   it("leaves missing calendar days as gaps when aligning unequal months", () => {
     const rows = [{ date: "2026-02-01", hour: 6, revenue: 100, quantity: 1, itemCode: "A", itemName: "A", category: "Food" }];
