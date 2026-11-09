@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "test": "vitest run",
     "aws:build": "sam build",
-    "aws:validate": "sam validate --lint"
+    "aws:validate": "sam validate --lint",
+    "db:staffing:check": "node scripts/staffing-migrations.mjs --staffing-only",
+    "db:staffing:plan": "node scripts/staffing-migrations.mjs --manual",
+    "aws:build:staffing": "node scripts/build-staffing-poller.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -17,17 +20,19 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "next": "^15.5.2",
+    "pdf-lib": "1.17.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "@eslint/eslintrc": "^3.3.1",
     "@types/node": "^22.15.3",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "esbuild": "^0.25.9",
     "eslint": "^9.35.0",
     "eslint-config-next": "^15.5.2",
-    "esbuild": "^0.25.9",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },

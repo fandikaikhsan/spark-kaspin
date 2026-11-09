@@ -23,7 +23,7 @@ const emptyStore: StoreFormState = {
   refreshToken: "",
 };
 
-function StoreForm({
+export function StoreForm({
   store,
   onSaved,
 }: {

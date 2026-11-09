@@ -27,7 +27,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not sign in");
-      router.replace(safeNextPath(nextPath));
+      router.replace(payload.role === "manager" ? "/staffing" : safeNextPath(nextPath));
       router.refresh();
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "Could not sign in");

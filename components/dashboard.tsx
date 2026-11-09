@@ -1,9 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { LogoutButton } from "@/components/logout-button";
 import { hottestItem } from "@/lib/analytics/aggregate";
 import type { DailyAnalytics, HourlyItemSale, TransactionReceipt } from "@/lib/analytics/types";
 
@@ -183,26 +181,10 @@ export function Dashboard({ initialData }: { initialData: DailyAnalytics }) {
   return (
     <main className="shell">
       <header className="masthead">
-        <div className="dashboard-brand">
-          <div>
-            <h1>Spark Intelligence</h1>
-          </div>
-          <Image
-            className="sarkop-logo"
-            src="/logo_sarkop_red.png"
-            alt="Sarkop"
-            width={3166}
-            height={1590}
-            priority
-          />
-        </div>
+        <div><p className="eyebrow">POS / SALES OVERVIEW</p><h1>Dashboard</h1><p className="subtitle">Penjualan dan transaksi harian di setiap store.</p></div>
         <div className="date-controls">
           <div className="control-labels">
             <label htmlFor="store-select">Store</label>
-            <span className="control-links">
-              <Link href="/settings">Settings</Link>
-              <LogoutButton />
-            </span>
           </div>
           <select
             id="store-select"

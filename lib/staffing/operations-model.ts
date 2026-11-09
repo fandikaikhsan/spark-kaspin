@@ -1,0 +1,30 @@
+import type { Staff, Shift, AttendanceSession, StaffingStore } from "./model";
+export type Money = { ceiling: number | null; outstanding: number; reserved: number; available: number | null; leave_balance: number | null };
+export type RosterStaff = Staff & { store_name: string; time_zone: string; region_id: string | null; money: Money; pending_requests: number; last_payroll: number | null };
+export type LeaveDate = { date: string; units: number };
+export type StaffRequest = { id: string; staff_id: string; kind: "paid_leave" | "unpaid_leave" | "sick" | "emergency" | "cash_advance"; payment_mode?: "none" | "leave" | "sick"; status: "pending" | "approved" | "rejected" | "cancelled" | "disbursed"; start_date: string | null; end_date: string | null; leave_dates: LeaveDate[]; days: number | null; amount: number | null; reason: string; document_note: string | null; decision_note: string | null; created_at: string; full_name?: string; store_name?: string; affected_shifts?: number };
+export type PayrollRule = { id: string; effective_from: string; normal_rate: number; day_hours: number; night_enabled: boolean; night_rate: number | null; night_start: string; night_end: string; overtime_percent: number; leave_day_rate: number | null; sick_day_rate: number | null; late_enabled: boolean; frequency_enabled: boolean; late_tiers: { minutes: number; amount: number }[]; frequency_tiers: { count: number; amount: number }[]; loan_repayment_cap: number | null };
+export type ReviewedSession = AttendanceSession & { time_zone: string; store_name: string; verification_state: "pending" | "confirmed" | "rejected"; review_note: string | null; reviewed_at: string | null };
+export type TimeApproval = { id: string; session_id: string; kind: "overtime" | "unpaid_break"; starts_at: string; ends_at: string; reason: string };
+export type Bonus = { id: string; staff_id: string; bonus_date: string; amount: number; reason: string; payroll_id: string | null };
+export type PayrollInput = { staff_id: string; period_start: string; period_end: string; time_zone: string; range_start: string; range_end: string; rule: PayrollRule | null; rule_changes: PayrollRule[]; sessions: ReviewedSession[]; time_approvals: TimeApproval[]; leave: StaffRequest[]; bonuses: Bonus[]; outstanding: number; posted: { id: string; period_start: string; period_end: string }[] };
+export type PayrollResult = { normal_pay: number; night_pay: number; overtime_pay: number; paid_leave_pay: number; sick_pay: number; bonuses: number; gross_pay: number; late_penalties: number; frequency_penalty: number; deductions: number; loan_repayment: number; net_pay: number; normal_hours: number; night_hours: number; overtime_hours: number; late_count: number; blockers: string[]; notes: string[]; lines: { session_id: string; normal_hours: number; night_hours: number; overtime_hours: number; late_minutes: number }[] };
+export type PayrollRecord = { id: string; period_start: string; period_end: string; result: PayrollResult; created_at: string };
+export type StaffDetail = { profile: Staff & { cash_advance_ceiling: number | null }; store: Pick<StaffingStore,"id" | "name" | "time_zone">; money: Money; rules: PayrollRule[]; requests: StaffRequest[]; leave_entries: { id: string; days: number; reason: string; created_at: string }[]; bonuses: Bonus[]; cash_ledger: { id: string; amount: number; reason: string; kind: string; created_at: string }[]; payrolls: PayrollRecord[]; discipline: { id: string; points: number; reason: string; created_at: string }[]; shifts: (Shift & { store_name: string; time_zone: string })[]; sessions: ReviewedSession[] };
+export type ActivityRow = Shift & { review_version?: string; payroll_locked?: boolean; overtime_from_attendance?: boolean; can_view_profile: boolean; full_name: string; store_name: string; time_zone: string; session_id: string | null; check_in_at: string | null; check_out_at: string | null; corrected_in_at: string | null; corrected_out_at: string | null; verification_state: "pending" | "confirmed" | "rejected" | null; review_note: string | null; reviewed_at: string | null; approved_leave: boolean; last_location: { latitude: number; longitude: number; sent_at: string; completed_at: string } | null };
+export type ShiftChangeRequest = {
+ id: string; requester_name: string; target_name: string; store_name: string; time_zone: string; mode: "replace" | "swap";
+ status: string; valid: boolean; created_at: string; expires_at: string; shift_snapshot: Shift; other_snapshot: Shift | null;
+};
+export type ActivityData = { rows: ActivityRow[]; requests: StaffRequest[]; shift_requests?: ShiftChangeRequest[] };
+export type HomeStats = { staff_count: number; active_staff: number; pending_requests: number; pending_attendance: number; committed_shifts: number; open_sessions: number };
+export function requestNeedsAction(request: Pick<StaffRequest, "kind" | "status">): boolean {
+  return request.status === "pending" || (request.kind === "cash_advance" && request.status === "approved");
+}
+export function requestStatusLabel(request: Pick<StaffRequest, "kind" | "status">): string {
+  return request.kind === "cash_advance" && request.status === "approved" ? "Menunggu pencairan" : stateLabels[request.status];
+}
+export const requestLabels: Record<StaffRequest["kind"],string> = { paid_leave: "Izin berbayar", unpaid_leave: "Izin tanpa upah", sick: "Sakit", emergency: "Izin darurat", cash_advance: "Kasbon" };
+export const stateLabels: Record<string,string> = { pending: "Menunggu review", approved: "Disetujui", rejected: "Ditolak", cancelled: "Dibatalkan", disbursed: "Dicairkan", confirmed: "Dikonfirmasi" };
+export const rupiah = (value: number | null | undefined) => value === null || value === undefined ? "Belum diatur" : new Intl.NumberFormat("id-ID", {style:"currency",currency:"IDR",maximumFractionDigits:0}).format(Number(value));
+export function validDate(value: unknown): value is string { if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value; }

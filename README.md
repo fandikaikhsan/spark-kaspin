@@ -226,3 +226,24 @@ pnpm aws:build     # requires AWS SAM CLI
 ```
 
 The source `api.json`, `.env`, `.aws-sam`, and `samconfig.toml` are excluded from source control because they can contain operational data or secrets.
+
+## Staffing attendance
+
+The first staffing slice adds region-scoped manager access, staff/shift setup, and
+group check-in/out with private Telegram onboarding. See [the staffing runbook](docs/staffing.md)
+for scope, staging migrations, the separate bot stack, and production activation checks.
+
+### Staffing production rollout
+
+Existing database changes were applied manually through Supabase SQL Editor.
+Follow [the Staffing rollout runbook](docs/staffing-production-rollout.md) and inspect the actual schema before applying pending SQL.
+`pnpm db:staffing:check` checks Staffing source ordering only;
+`pnpm db:staffing:plan --preflight /path/preflight.json` checks a manual first-install plan against a read-only catalog export, without accessing a database.
+Historical POS files are not part of this rollout. Their duplicate `20260927` prefix matters for a future CLI baseline, not the manual Staffing install.
+
+### Staffing Telegram transport
+
+The selected deployment serves `/api/telegram/staffing` on the existing Next.js dashboard.
+The existing `spark-kaspin-pos-poller` in `us-east-2` handles bounded notification retries; no extra Lambda or schedule is created.
+See [activation, deployment preparation and rollback](docs/staffing-dashboard-webhook.md).
+`pnpm aws:build:staffing` builds only the existing `worker.handler` ZIP. The generic two-function SAM template above describes an alternative, not the current manual Lambda deployment.

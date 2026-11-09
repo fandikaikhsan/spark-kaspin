@@ -1,0 +1,3 @@
+import{ActivityBoard}from"@/components/staffing/activity-board";import{operationsRpc}from"@/lib/staffing/operations-service";import{staffingDashboard}from"@/lib/staffing/service";import type{ActivityData}from"@/lib/staffing/operations-model";
+export const dynamic="force-dynamic";
+export default async function Activities(){const[data,base]=await Promise.all([operationsRpc<ActivityData>("staffing_activity",{p_store:null,p_day:null}),staffingDashboard()]);return <ActivityBoard initial={data}stores={base.stores}canConfigure={base.canConfigure}reports={base.reports.map(report=>({...report,full_name:base.sessions.find(session=>session.id===report.session_id)?.full_name||"Staff"}))}/>;}

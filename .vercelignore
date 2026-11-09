@@ -2,3 +2,10 @@
 api.json
 node_modules
 .next
+.env*
+.aws/
+.aws-sam/
+samconfig*.toml
+aws/lambda/*.zip
+worker.js.zip
+staffing-preflight.json

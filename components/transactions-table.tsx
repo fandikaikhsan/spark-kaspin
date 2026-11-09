@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogoutButton } from "@/components/logout-button";
 import type { TransactionPage } from "@/lib/analytics/types";
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
@@ -69,7 +68,6 @@ export function TransactionsTable({ initialData }: { initialData: TransactionPag
         </div>
         <nav className="header-actions" aria-label="Account and navigation">
           <Link className="back-link" href="/">Back to dashboard</Link>
-          <LogoutButton />
         </nav>
       </header>
 

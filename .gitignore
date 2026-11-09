@@ -10,3 +10,8 @@ samconfig.toml
 .DS_Store
 aws/lambda/*.zip
 worker.js.zip
+
+.vercel/
+
+# Local production catalog snapshot
+staffing-preflight.json

@@ -1,7 +1,7 @@
 export const SESSION_COOKIE = "spark_intelligence_session";
 export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
 
-export type UserRole = "super_admin" | "admin";
+export type UserRole = "super_admin" | "admin" | "manager";
 
 export type AuthSession = {
   userId: string;
@@ -73,7 +73,7 @@ export async function verifySessionToken(token: string | undefined): Promise<Aut
     if (
       typeof session.userId !== "string" ||
       typeof session.username !== "string" ||
-      (session.role !== "admin" && session.role !== "super_admin") ||
+      (session.role !== "admin" && session.role !== "super_admin" && session.role !== "manager") ||
       typeof session.expiresAt !== "number" ||
       session.expiresAt <= Math.floor(Date.now() / 1000)
     ) return null;

@@ -1,3 +1,4 @@
+import { flushStaffingNotifications } from "../../lib/staffing/notifications";
 import { refreshIntervalSeconds } from "../../lib/env";
 import { businessDateForTimeZone, listStores, type Store } from "../../lib/stores";
 import {
@@ -29,7 +30,16 @@ const sleep = (milliseconds: number) =>
  * EventBridge starts this Lambda once per minute. The invocation creates one
  * audit row per store, then performs short polling cycles for most of the minute.
  */
-export async function handler(_event: unknown, context: LambdaContext) {
+export async function handler(event: unknown, context: LambdaContext) {
+  // One bounded retry pass shares the existing minute tick. It cannot fail POS.
+  const retry = flushStaffingNotifications({
+    budgetMs: Math.min(3000, Math.max(0, context.getRemainingTimeInMillis() - 5000)), maxMessages: 2,
+  }).catch(() => { console.error("Staffing notification retry failed; POS polling continues"); });
+  try { return await pollPos(event, context); }
+  finally { await retry; }
+}
+
+async function pollPos(_event: unknown, context: LambdaContext) {
   const invocationStartedAt = new Date();
   const intervalMilliseconds = refreshIntervalSeconds() * 1_000;
   const stores = await listStores(true);
