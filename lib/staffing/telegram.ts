@@ -5,9 +5,10 @@ export type AttendanceUpdate = {
   kind: "start" | "check_in" | "check_out" | "cancel" | "confirm" | "report" | "location" | "photo" | "schedule" |
     "menu" | "balance" | "history" | "income" | "leave_status" | "cash_status" | "help" |
     "swap_start" | "swap_pick" | "swap_accept" | "swap_reject" | "swap_cancel" |
-    "request_start" | "request_pick" | "request_input" | "document";
+    "request_start" | "request_pick" | "request_input" | "document" | "proxy_check_in" | "proxy_check_out";
   userId: number; chatId: number; chatType: string; messageId: number | null; replyTo: number | null;
   sentAt: string | null; timestampSource: "telegram_message" | "server_received";
+  attendeeCode?: string;
   attemptId?: string; tokenHash?: string; latitude?: number; longitude?: number; fileId?: string; fileUniqueId?: string;
   inputText?: string; fileMime?: string; fileSize?: number;
   flowToken?: string; choice?: string; entityId?: string; requestId?: string; scheduleDate?: string;
@@ -83,6 +84,7 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
     if (extra || (target && target.toLowerCase() !== botUsername.toLowerCase())) return null;
     const commands: Record<string, AttendanceUpdate["kind"]> = { "/start": "start", "/masuk": "check_in", "/pulang": "check_out", "/batal": "cancel", "/jadwal": "schedule", "/menu": "menu", "/saldo": "balance", "/absensi": "history", "/penghasilan": "income", "/izin": "leave_status", "/kasbon": "cash_status", "/tukar": "swap_start", "/bantuan": "help" };
     const kind = commands[name];
+    if (parts.length === 2 && (kind === "check_in" || kind === "check_out") && ["group", "supergroup"].includes(String(chat.type)) && /^[A-Za-z0-9._-]{1,40}$/.test(parts[1])) return { ...base, kind: kind === "check_in" ? "proxy_check_in" : "proxy_check_out", attendeeCode: parts[1] };
     if (!kind || (parts.length === 2 && (kind !== "start" || !/^[a-f0-9]{48}$/.test(parts[1])))) return null;
     return { ...base, kind, ...(kind === "start" && parts[1] ? { tokenHash: invitationHash(parts[1]) } : {}) };
   }
