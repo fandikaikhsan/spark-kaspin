@@ -1,0 +1,3 @@
+import{WeeklyPlanner}from"@/components/staffing/weekly-planner";import{staffingDashboard}from"@/lib/staffing/service";import{validMonday}from"@/lib/staffing/schedule";
+export const dynamic="force-dynamic";
+export default async function Editor({searchParams}:{searchParams:Promise<{store?:string;week?:string}>}){const[data,p]=await Promise.all([staffingDashboard(),searchParams]);const stores=data.stores.filter(s=>s.active&&s.region_id);return <WeeklyPlanner stores={stores}canConfigure={data.canConfigure}initialStore={stores.some(s=>s.id===p.store)?p.store:undefined}initialWeek={p.week&&validMonday(p.week)?p.week:undefined}/>;}

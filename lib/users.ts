@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 export type ManagedUser = {
   id: string;
   username: string;
-  role: "admin";
+  role: "admin" | "manager";
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -13,7 +13,7 @@ export type ManagedUser = {
 export type UserInput = {
   username: string;
   password?: string;
-  role: "admin";
+  role: "admin" | "manager";
   active: boolean;
 };
 
@@ -22,7 +22,7 @@ type UserRow = {
   username: string;
   normalized_username: string;
   password_hash: string;
-  role: "admin";
+  role: "admin" | "manager";
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -54,11 +54,11 @@ export function parseUserInput(value: unknown, requirePassword: boolean): UserIn
   if ((requirePassword || password) && password.length < 8) {
     throw new Error("Password must contain at least 8 characters");
   }
-  if (role !== "admin") throw new Error("Admin is the only available role");
+  if (role !== "admin" && role !== "manager") throw new Error("Admin and manager are the only available roles");
 
   return {
     username,
-    role: "admin",
+    role,
     active: input.active !== false,
     ...(password ? { password } : {}),
   };

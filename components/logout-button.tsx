@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
-export function LogoutButton() {
+export function LogoutButton({ onBeforeLogout }: { onBeforeLogout?: () => boolean } = {}) {
   const [loading, setLoading] = useState(false);
 
   async function logout() {
+    if (onBeforeLogout && !onBeforeLogout()) return;
     setLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });

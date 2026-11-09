@@ -33,6 +33,6 @@ describe("dashboard authentication", () => {
     expect(parseUserInput({ username: "branch.admin", password: "password123", role: "admin" }, true))
       .toMatchObject({ username: "branch.admin", role: "admin", active: true });
     expect(() => parseUserInput({ username: "viewer", password: "password123", role: "viewer" }, true))
-      .toThrow("only available role");
+      .toThrow("only available roles");
   });
 });

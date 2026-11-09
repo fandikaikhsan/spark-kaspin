@@ -6,7 +6,7 @@ import type { ManagedUser } from "@/lib/users";
 type UserFormState = {
   username: string;
   password: string;
-  role: "admin";
+  role: "admin" | "manager";
   active: boolean;
 };
 
@@ -17,7 +17,7 @@ const emptyUser: UserFormState = {
   active: true,
 };
 
-function UserForm({
+export function UserForm({
   user,
   onSaved,
 }: {
@@ -27,7 +27,7 @@ function UserForm({
   const [form, setForm] = useState<UserFormState>({
     username: user?.username || "",
     password: "",
-    role: "admin",
+    role: user?.role || "admin",
     active: user?.active ?? true,
   });
   const [saving, setSaving] = useState(false);
@@ -83,8 +83,9 @@ function UserForm({
         </label>
         <label>
           <span>Role</span>
-          <select value="admin" disabled aria-label="Role">
+          <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserFormState["role"] })} aria-label="Role">
             <option value="admin">Admin</option>
+            <option value="manager">Staffing manager</option>
           </select>
         </label>
       </div>
@@ -115,7 +116,7 @@ export function UserManagement({ initialUsers }: { initialUsers: ManagedUser[] }
           <p className="eyebrow">Access control</p>
           <h2 id="users-title">User management</h2>
         </div>
-        <p>Admins can view the dashboard and manage stores and users.</p>
+        <p>Admins manage the dashboard. Staffing managers only access their assigned regions; assign regions under Staffing.</p>
       </div>
       <div className="settings-stack">
         {users.map((user) => (

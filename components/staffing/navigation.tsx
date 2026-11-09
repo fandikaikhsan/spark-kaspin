@@ -1,0 +1,4 @@
+import Link from "next/link";
+export function StaffingHeader({title,subtitle,current,canConfigure=false}:{title:string;subtitle?:string;current?:string;canConfigure?:boolean}){
+ return <header className="ops-header"><div><Link href="/staffing" className="ops-brand">SPARK / PEOPLE & OPERATIONS</Link><h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><nav aria-label="Navigasi staffing"><Link href="/staffing" aria-current={current==="home"?"page":undefined}>Overview</Link><Link href="/staffing/staff" aria-current={current==="staff"?"page":undefined}>Staff Management</Link><Link href="/staffing/schedule" aria-current={current==="schedule"?"page":undefined}>Scheduling</Link><Link href="/staffing/activities" aria-current={current==="activity"?"page":undefined}>Activities</Link>{canConfigure&&<Link href="/staffing/settings" aria-current={current==="settings"?"page":undefined}>Pengaturan</Link>}</nav></header>;
+}

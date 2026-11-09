@@ -1,0 +1,3 @@
+import{StaffProfile}from"@/components/staffing/staff-profile";import{operationsRpc,staffId}from"@/lib/staffing/operations-service";import{staffingDashboard}from"@/lib/staffing/service";import type{StaffDetail}from"@/lib/staffing/operations-model";
+export const dynamic="force-dynamic";
+export default async function StaffPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{tab?:string}>}){const{id}=await params;const query=await searchParams;const[detail,base]=await Promise.all([operationsRpc<StaffDetail>("staffing_staff_detail",{p_staff:staffId(id)}),staffingDashboard()]);return <StaffProfile detail={detail}canConfigure={base.canConfigure}initialTab={query.tab}/>;}

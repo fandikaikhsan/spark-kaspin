@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Spark Staffing Telegram attendance worker (separate from POS ingestion)
+Parameters:
+  SupabaseUrl:
+    Type: String
+  SupabaseSecretKey:
+    Type: String
+    NoEcho: true
+  StaffingBotToken:
+    Type: String
+    NoEcho: true
+  StaffingWebhookSecret:
+    Type: String
+    NoEcho: true
+  StaffingBotUsername:
+    Type: String
+Resources:
+  StaffingLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-staffing"
+      RetentionInDays: 7
+  StaffingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-staffing"
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 256
+      CodeUri: .
+      Handler: aws/lambda/staffing.handler
+      Timeout: 90
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref StaffingLogs
+      Environment:
+        Variables:
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
+          STAFFING_TELEGRAM_BOT_TOKEN: !Ref StaffingBotToken
+          STAFFING_TELEGRAM_WEBHOOK_SECRET: !Ref StaffingWebhookSecret
+          STAFFING_TELEGRAM_BOT_USERNAME: !Ref StaffingBotUsername
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+      Events:
+        RetryNotifications:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Input: '{"flush":true}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints: [aws/lambda/staffing.ts]
+        Minify: true
+        Target: es2022
+Outputs:
+  StaffingWebhookUrl:
+    Description: Register with the staffing bot using setWebhook and the configured secret_token.
+    Value: !GetAtt StaffingFunctionUrl.FunctionUrl
