@@ -251,3 +251,11 @@ See [activation, deployment preparation and rollback](docs/staffing-dashboard-we
 ### Staffing self-service update
 
 Store timezone (WIB/WITA/WIT), editable regions, private Telegram leave/cash-advance applications, and staff-first shift exchange use the incremental [self-service rollout guide](docs/staffing-self-service-rollout.md). For a production database with the first seven Staffing migrations already installed, apply only `20261109180000_staffing_self_service.sql`, then its read-only postflight check.
+
+### Review application corrections
+
+Pending leave dates/units and cash-advance amounts can be corrected by an authorized manager, with original values, audit history, and private staff notifications. Apply the incremental `20261109200000_staffing_request_amendment.sql` migration and follow [the request review guide](docs/staffing-request-review.md).
+
+### Payroll documents and delegated attendance
+
+Leave evidence appears inline, attendance review notes are optional, and payroll supports draft/final PDF preview, download, and recipient-verified personal Telegram delivery. Group attendance can be reported for another scheduled staff member using their stable code while preserving both identities. Follow [the PDF/attendance rollout and finalization guide](docs/staffing-payroll-documents-attendance.md).

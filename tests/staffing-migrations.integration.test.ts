@@ -108,7 +108,7 @@ describe("staffing rollout against an existing POS database", () => {
   });
   it("uses sortable, unique Staffing timestamps in dependency order", async () => {
     const sorted = readdirSync(directory).filter(file => file.includes("staffing")).sort();
-    expect(sorted).toEqual([...migrations, "20261109180000_staffing_self_service.sql"]);
+    expect(sorted).toEqual([...migrations, "20261109180000_staffing_self_service.sql", "20261109200000_staffing_request_amendment.sql", "20261109210000_staffing_payroll_documents_proxy.sql"]);
     expect(sorted.every(file => /^\d{14}_/.test(file))).toBe(true);
     const isolated = await baseline();
     try { await expect(isolated.exec(sql(sorted[1]))).rejects.toThrow(/staffing_shifts/); }
@@ -150,7 +150,7 @@ describe("staffing rollout against an existing POS database", () => {
       const file = join(directory, "preflight.json"); writeFileSync(file, JSON.stringify(initialReport));
       const result = spawnSync(process.execPath, ["scripts/staffing-migrations.mjs", "--manual", "--preflight", file], { encoding: "utf8" });
       expect(result.status).toBe(0);
-      const plan = JSON.parse(result.stdout); expect(plan.pending).toHaveLength(8); expect(plan.preflightAccepted).toBe(true);
+      const plan = JSON.parse(result.stdout); expect(plan.pending).toHaveLength(10); expect(plan.preflightAccepted).toBe(true);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 

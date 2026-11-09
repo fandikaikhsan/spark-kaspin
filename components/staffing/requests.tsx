@@ -1,5 +1,7 @@
 "use client";
+import { RequestEvidence } from "./request-evidence";
 import{useState}from"react";
+import { RequestEditor } from "./request-editor";
 import{OperationForm}from"./operation-form";
 import{addDays}from"@/lib/staffing/schedule";
 import{requestLabels,requestNeedsAction,requestStatusLabel,rupiah,type StaffRequest}from"@/lib/staffing/operations-model";
@@ -19,10 +21,13 @@ export function RequestActions({request}:{request:StaffRequest}){
  const current=actions.some(a=>a[0]===action)?action:actions[0][0];
  return <OperationForm action={current}data={{request_id:request.id}}label={actions.find(a=>a[0]===current)?.[1]||"Simpan"}><label>Tindakan<select aria-label="Keputusan pengajuan"value={current}onChange={e=>setAction(e.target.value)}>{actions.map(([a,l])=><option key={a}value={a}>{l}</option>)}</select></label>{current==="disburse"?<p className="ops-muted">Konfirmasi setelah uang benar-benar diserahkan. Tindakan ini mencatat utang, tanpa transfer bank.</p>:<label>Catatan keputusan<input name="note"required={current!=="approve_request"}minLength={current!=="approve_request"?5:undefined}maxLength={1000}/></label>}</OperationForm>;
 }
-export function RequestCard({request}:{request:StaffRequest}){
- return <article className="ops-request"><div className="ops-row-heading"><div><span className="ops-eyebrow">{requestLabels[request.kind]}</span><h3>{request.full_name||"Rincian pengajuan"}</h3></div><RequestStatusBadge request={request}/></div>
+export function RequestCard({request:provided,onSaved}:{request:StaffRequest;onSaved?:()=>void}){
+ const[local,setLocal]=useState<StaffRequest|null>(null),[editing,setEditing]=useState(false);
+ const request=local&&local.id===provided.id&&(local.revision??0)>(provided.revision??0)?local:provided;
+ return <article className="ops-request"><div className="ops-row-heading"><div><span className="ops-eyebrow">{requestLabels[request.kind]}</span><h3>{request.full_name||"Rincian pengajuan"}</h3></div><div className="ops-action-group"><RequestStatusBadge request={request}/>{request.status==="pending"&&!editing&&<button type="button" className="ops-secondary" onClick={()=>setEditing(true)}>Edit pengajuan</button>}</div></div>
  <dl className="ops-detail-grid"><div><dt>{request.kind==="cash_advance"?"Nominal":"Periode"}</dt><dd>{request.kind==="cash_advance"?rupiah(request.amount):`${request.start_date} — ${request.end_date}`}</dd></div>{request.kind!=="cash_advance"&&<div><dt>Jumlah hari</dt><dd>{request.days} hari</dd></div>}<div className="is-full"><dt>Alasan pengajuan</dt><dd>{request.reason}</dd></div></dl>
- {request.evidence_file_id && <p><a className="ops-inline-link" href={`/api/staffing/evidence?request=${request.id}`} target="_blank" rel="noopener noreferrer">Lihat bukti {request.evidence_mime === "application/pdf" ? "PDF" : "foto"}</a></p>}
+ {request.evidence_file_id && <RequestEvidence id={request.id} pdf={request.evidence_mime === "application/pdf"} />}
  {request.kind!=="cash_advance"&&<details><summary>Tanggal yang dihitung</summary>{request.leave_dates.map(d=><p className="ops-muted"key={d.date}>{d.date} · {d.units} hari</p>)}</details>}
- {request.kind==="emergency"&&<p className="ops-muted">Upah: {request.payment_mode==="leave"?"Izin berbayar, mengurangi saldo":request.payment_mode==="sick"?"Tarif sakit":"Tanpa upah"}</p>}{request.document_note&&<p className="ops-muted">Bukti: {request.document_note}</p>}{request.affected_shifts!==undefined&&request.kind!=="cash_advance"&&<p className="ops-impact">{request.affected_shifts} shift terjadwal terdampak</p>}{request.decision_note&&<p className="ops-muted">Keputusan: {request.decision_note}</p>}<RequestActions request={request}/></article>;
+ {request.kind==="emergency"&&<p className="ops-muted">Upah: {request.payment_mode==="leave"?"Izin berbayar, mengurangi saldo":request.payment_mode==="sick"?"Tarif sakit":"Tanpa upah"}</p>}{request.document_note&&<p className="ops-muted">Bukti: {request.document_note}</p>}{request.affected_shifts!==undefined&&request.kind!=="cash_advance"&&<p className="ops-impact">{request.affected_shifts} shift terjadwal terdampak</p>}{request.decision_note&&<p className="ops-muted">Keputusan: {request.decision_note}</p>}{request.original_values&&<div className="notice"><strong>Pengajuan awal</strong><p>{request.kind==="cash_advance"?rupiah(request.original_values.amount):`${request.original_values.start_date} — ${request.original_values.end_date} · ${request.original_values.days} hari`}</p><p>Koreksi terakhir: {request.amendment_note}</p></div>}
+ {editing&&request.status==="pending"?<RequestEditor key={`${request.id}:${request.revision??0}`} request={request} onCancel={()=>setEditing(false)} onSaved={next=>{setLocal({...request,...next});setEditing(false);onSaved?.();}}/>:<RequestActions request={request}/>}</article>;
 }

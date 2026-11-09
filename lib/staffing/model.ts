@@ -5,6 +5,7 @@ export type StaffingStore = { id: string; name: string; time_zone: string; activ
 export type Staff = { id: string; code: string; full_name: string; home_store_id: string; active: boolean; telegram_linked: boolean };
 export type Shift = { replaces_staff_id?: string | null; replaced_staff_name?: string | null; id: string; staff_id: string; store_id: string; label: string; starts_at: string; ends_at: string };
 export type AttendanceSession = {
+  check_in_reporter_name?: string | null; check_out_reporter_name?: string | null;
   review_version?: string; payroll_locked?: boolean; overtime_from_attendance?: boolean; replaced_staff_name?: string | null;
   id: string; shift_id: string; staff_id: string; full_name: string; store_id: string; label: string;
   starts_at: string; ends_at: string; check_in_at: string; check_out_at: string | null;
