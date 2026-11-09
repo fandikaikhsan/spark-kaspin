@@ -247,3 +247,7 @@ The selected deployment serves `/api/telegram/staffing` on the existing Next.js 
 The existing `spark-kaspin-pos-poller` in `us-east-2` handles bounded notification retries; no extra Lambda or schedule is created.
 See [activation, deployment preparation and rollback](docs/staffing-dashboard-webhook.md).
 `pnpm aws:build:staffing` builds only the existing `worker.handler` ZIP. The generic two-function SAM template above describes an alternative, not the current manual Lambda deployment.
+
+### Staffing self-service update
+
+Store timezone (WIB/WITA/WIT), editable regions, private Telegram leave/cash-advance applications, and staff-first shift exchange use the incremental [self-service rollout guide](docs/staffing-self-service-rollout.md). For a production database with the first seven Staffing migrations already installed, apply only `20261109180000_staffing_self_service.sql`, then its read-only postflight check.

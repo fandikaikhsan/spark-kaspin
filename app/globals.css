@@ -947,3 +947,5 @@ input[type="date"] {
 .ops-settings-shell .staffing-form textarea { font:inherit; }
 @media(max-width:1000px) { .ops-settings-layout{grid-template-columns:190px minmax(0,1fr);gap:22px}.ops-settings-nav-group a{padding:11px 10px;font-size:.77rem}.ops-settings-panel{padding:20px} }
 @media(max-width:700px) { .ops-settings-layout{grid-template-columns:minmax(0,1fr);gap:22px}.ops-settings-sidebar{position:static;padding:0}.ops-settings-sidebar nav{display:flex;overflow:auto;gap:18px}.ops-settings-nav-group{display:flex;gap:6px;align-items:center;margin:0}.ops-settings-nav-group>p,.ops-settings-back{display:none}.ops-settings-nav-group a{white-space:nowrap;padding:11px}.ops-settings-nav-group a>svg:last-child{display:none}.ops-settings-section-heading{flex-wrap:wrap}.ops-settings-panel{padding:18px}.ops-settings-subsection{align-items:flex-start;flex-direction:column}.ops-settings-subsection>.ops-secondary{align-self:flex-start}.ops-review-range .ops-time-chip{font-size:.83rem} }
+
+.ops-settings-table-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }

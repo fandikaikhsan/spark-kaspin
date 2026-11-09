@@ -7,9 +7,11 @@ import { UserManagement } from "@/components/user-management";
 import type { StoreAdminSummary } from "@/lib/store-settings";
 import type { ManagedUser } from "@/lib/users";
 
+import { STORE_ZONE_LABELS, type StoreTimeZone } from "@/lib/store-timezone";
+
 type StoreFormState = {
   name: string;
-  timeZone: "Asia/Jakarta" | "Asia/Makassar";
+  timeZone: StoreTimeZone;
   active: boolean;
   accessToken: string;
   refreshToken: string;
@@ -89,7 +91,7 @@ export function StoreForm({
           />
         </label>
         <label>
-          <span>Timezone</span>
+          <span>Zona waktu store</span>
           <select
             value={form.timeZone}
             onChange={(event) => setForm({
@@ -97,8 +99,7 @@ export function StoreForm({
               timeZone: event.target.value as StoreFormState["timeZone"],
             })}
           >
-            <option value="Asia/Jakarta">UTC+7 · Asia/Jakarta</option>
-            <option value="Asia/Makassar">UTC+8 · Asia/Makassar</option>
+            {Object.entries(STORE_ZONE_LABELS).map(([zone,label]) => <option key={zone} value={zone}>{label} · {zone}</option>)}
           </select>
         </label>
         <label>
@@ -124,6 +125,7 @@ export function StoreForm({
         </label>
       </div>
 
+      <p className="ops-muted">Jadwal, absensi, tanggal operasional, dan payroll mengikuti zona waktu store. Mengubah zona waktu tidak menggeser waktu shift yang sudah tersimpan.</p>
       <div className="store-form-actions">
         <label className="active-toggle">
           <input

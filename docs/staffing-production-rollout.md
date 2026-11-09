@@ -1,5 +1,7 @@
 # Rollout Staffing melalui Supabase SQL Editor
 
+> Untuk database yang sudah menyelesaikan tujuh migration awal, gunakan [panduan update pengajuan Telegram](staffing-self-service-rollout.md). Jangan mengulang instalasi awal di bawah ini.
+
 Pengguna mengonfirmasi pada 9 November 2026 bahwa perubahan sebelumnya dilakukan dengan copy-paste SQL ke SQL Editor Supabase. Jalur rollout ini mengikuti proses manual tersebut. Tidak ada deployment, perubahan history, atau perubahan data produksi yang dijalankan saat menulis panduan ini.
 
 File SQL repository adalah source perubahan yang ditinjau. History CLI tidak dapat dianggap sebagai daftar lengkap perubahan yang pernah dilakukan manual. Dua file POS lama sama-sama memakai prefix `20260927`; ini bukan blocker rollout manual Staffing, dan keduanya **tidak dijalankan ulang**. Peralihan ke CLI di masa depan membutuhkan baseline schema dan reconciliation tersendiri. SQL Editor tidak otomatis mencatat perubahan ke history CLI. [Dokumentasi Supabase](https://supabase.com/docs/guides/deployment/database-migrations)
