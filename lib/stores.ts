@@ -1,11 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
-export const STORE_TIME_ZONES = {
-  "Asia/Jakarta": "+07:00",
-  "Asia/Makassar": "+08:00",
-} as const;
-
-export type StoreTimeZone = keyof typeof STORE_TIME_ZONES;
+import type { StoreTimeZone } from "./store-timezone";
+export { STORE_TIME_ZONES, type StoreTimeZone } from "./store-timezone";
 
 export type Store = {
   id: string;

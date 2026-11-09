@@ -32,7 +32,7 @@ export function parseStoreSettingsInput(
   const refreshToken = typeof input.refreshToken === "string" ? input.refreshToken.trim() : "";
 
   if (!name) throw new Error("Store name is required");
-  if (!(timeZone in STORE_TIME_ZONES)) throw new Error("Select a supported store timezone");
+  if (!Object.hasOwn(STORE_TIME_ZONES, timeZone)) throw new Error("Select a supported store timezone");
   if (options.requireRefreshToken && !refreshToken) {
     throw new Error("An initial refresh token is required for a new store");
   }

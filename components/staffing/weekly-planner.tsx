@@ -1,4 +1,5 @@
 "use client";
+import { storeZoneLabel } from "@/lib/store-timezone";
 import { ArrowIcon, Modal } from "./modal";
 
 import Link from "next/link";
@@ -205,7 +206,7 @@ export function WeeklyPlanner({ stores, initialStore, initialWeek }: { stores: S
       <nav className="planner-toolbar-nav" aria-label="Navigasi jadwal"><Link className="planner-secondary" href="/staffing/schedule" onClick={(e)=>{if(!discardAllowed())e.preventDefault();}}>Jadwal committed</Link><Link className="planner-secondary" href="/staffing" onClick={(e)=>{if(!discardAllowed())e.preventDefault();}}>Overview</Link></nav>
       <label>Store<select value={storeId} disabled={saving || loading} onChange={(event) => { if (discardAllowed()) { setData(null); setStoreId(event.target.value); } }}>{!stores.length && <option value="">Belum ada store ber-region</option>}{stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <div className="planner-week-nav"><button type="button" aria-label="Minggu sebelumnya" disabled={saving || loading} onClick={() => changeWeek(addDays(week, -7))}><ArrowIcon direction="left" /></button><label>Minggu mulai<input type="date" value={week} disabled={saving || loading} onChange={(event) => { if (event.target.value) changeWeek(mondayOf(event.target.value)); }} /></label><button type="button" aria-label="Minggu berikutnya" disabled={saving || loading} onClick={() => changeWeek(addDays(week, 7))}><ArrowIcon /></button><button type="button" disabled={saving || loading} onClick={() => changeWeek(mondayOf(today))}>Minggu ini</button></div>
-      <span className="planner-timezone">{zone === "Asia/Jakarta" ? "WIB · UTC+7" : "WITA · UTC+8"}</span>
+      <span className="planner-timezone">{storeZoneLabel(zone)}</span>
       <div className="planner-save-actions"><span className={`planner-draft-status ${dirty ? "is-dirty" : ""}`}>{!ready ? "Belum dimuat" : dirty ? "● Draft belum disimpan" : "✓ Tersimpan"}</span><button type="button" className="planner-secondary" disabled={!history.length || saving || loading} onClick={() => { const previous = history[history.length - 1]; setHistory(history.slice(0, -1)); setDraft(previous); draftRef.current = previous; setPreview(null); }}>Undo</button><button type="button" className="planner-secondary" disabled={saving || loading || !storeId} onClick={() => { if (discardAllowed()) setReload((n) => n + 1); }}>Muat ulang</button><button className="planner-primary" type="button" onClick={commit} disabled={!dirty || !ready || saving || loading || !!conflicts.length || !!preview}>{saving ? "Menyimpan…" : "Commit jadwal"}</button></div>
     </section>
     {error && <p className="planner-alert is-error" role="alert">{error}</p>}{notice && <p className="planner-alert" role="status">{notice}</p>}

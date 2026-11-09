@@ -4,10 +4,12 @@ export type AttendanceUpdate = {
   updateId: number;
   kind: "start" | "check_in" | "check_out" | "cancel" | "confirm" | "report" | "location" | "photo" | "schedule" |
     "menu" | "balance" | "history" | "income" | "leave_status" | "cash_status" | "help" |
-    "swap_start" | "swap_pick" | "swap_accept" | "swap_reject" | "swap_cancel";
+    "swap_start" | "swap_pick" | "swap_accept" | "swap_reject" | "swap_cancel" |
+    "request_start" | "request_pick" | "request_input" | "document";
   userId: number; chatId: number; chatType: string; messageId: number | null; replyTo: number | null;
   sentAt: string | null; timestampSource: "telegram_message" | "server_received";
   attemptId?: string; tokenHash?: string; latitude?: number; longitude?: number; fileId?: string; fileUniqueId?: string;
+  inputText?: string; fileMime?: string; fileSize?: number;
   flowToken?: string; choice?: string; entityId?: string; requestId?: string; scheduleDate?: string;
 };
 type Message = {
@@ -15,6 +17,7 @@ type Message = {
   sender_chat?: unknown; forward_origin?: unknown; is_automatic_forward?: boolean;
   text?: string; reply_to_message?: { message_id: number };
   location?: { latitude: number; longitude: number };
+  document?: { file_id: string; file_unique_id: string; mime_type?: string; file_size?: number };
   photo?: { file_id: string; file_unique_id: string; width: number; height: number }[];
 };
 export type TelegramUpdate = { update_id: number; message?: Message; callback_query?: { id: string; from: { id: number; is_bot?: boolean }; message?: Message; data?: string } };
@@ -49,6 +52,10 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
       const kind = ({ c: "confirm", x: "cancel", r: "report" } as const)[parts[1] as "c" | "x" | "r"];
       return kind ? { ...base, kind, attemptId: parts[2] } : null;
     }
+    if (parts[0] === "rq" && parts.length === 2 && ["leave", "cash"].includes(parts[1])) return { ...base, kind: "request_start", choice: parts[1] };
+    if (parts[0] === "rf" && parts.length === 4 && /^[a-f0-9]{12}$/.test(parts[2]) &&
+      ((parts[1] === "type" && ["paid_leave", "unpaid_leave", "sick"].includes(parts[3])) ||
+       (parts[1] === "send" && parts[3] === "yes"))) return { ...base, kind: "request_pick", choice: parts[1], flowToken: parts[2], entityId: parts[3] };
     if (parts[0] === "sg" && parts.length === 2 && /^\d{4}-\d{2}-\d{2}$/.test(parts[1])) {
       const date = new Date(parts[1] + "T00:00:00Z");
       return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === parts[1] ? { ...base, kind: "schedule", scheduleDate: parts[1] } : null;
@@ -67,6 +74,9 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
     return null;
   }
   if (typeof message.text === "string") {
+    if (chat.type === "private" && base.replyTo && !message.text.trim().startsWith("/") && message.text.trim().length <= 2000) {
+      return { ...base, kind: "request_input", inputText: message.text.trim() };
+    }
     const parts = message.text.trim().split(/\s+/);
     if (parts.length > 2) return null;
     const [name, target, extra] = parts[0].split("@");
@@ -80,6 +90,11 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
     const { latitude, longitude } = message.location;
     if (typeof latitude !== "number" || typeof longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
     return { ...base, kind: "location", latitude, longitude };
+  }
+  if (chat.type === "private" && object(message.document)) {
+    const d = message.document;
+    if (typeof d.file_id !== "string" || !d.file_id.length || d.file_id.length > 1024 || typeof d.file_unique_id !== "string" || !d.file_unique_id.length || d.file_unique_id.length > 256 || !["application/pdf", "image/jpeg", "image/png"].includes(String(d.mime_type)) || !positive(d.file_size) || d.file_size > 10 * 1024 * 1024) return null;
+    return { ...base, kind: "document", fileId: d.file_id, fileUniqueId: d.file_unique_id, fileMime: String(d.mime_type), fileSize: d.file_size };
   }
   if (Array.isArray(message.photo) && message.photo.length) {
     const photos = message.photo.filter(p => object(p) && typeof p.file_id === "string" && p.file_id.length > 0 && p.file_id.length <= 1024 && typeof p.file_unique_id === "string" && p.file_unique_id.length > 0 && p.file_unique_id.length <= 256 && positive(p.width) && positive(p.height)) as NonNullable<Message["photo"]>;

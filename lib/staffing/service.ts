@@ -32,13 +32,18 @@ export async function staffingDashboard(): Promise<StaffingData> {
   return data as StaffingData;
 }
 
-const actions = new Set(["region", "store_region", "manager_region", "group", "staff", "invite", "shift", "correction", "resolve_report"]);
+const actions = new Set(["region_update", "store_region_update", "region", "store_region", "manager_region", "group", "staff", "invite", "shift", "correction", "resolve_report"]);
 
 export async function manageStaffing(action: string, input: unknown) {
   if (!actions.has(action) || !input || typeof input !== "object" || Array.isArray(input)) throw new StaffingError("Invalid staffing request", 400);
   const actor = await staffingActor();
   const value = { ...input } as Record<string, unknown>;
   let invitation: string | undefined;
+  if (action === "region_update" || action === "store_region_update") {
+    const { data, error } = await getSupabaseAdmin().rpc("staffing_configure_organization", { ...actor, p_action: action, p_data: value });
+    if (error) databaseError(error);
+    return data;
+  }
   if (action === "invite") {
     const username = process.env.STAFFING_TELEGRAM_BOT_USERNAME?.trim();
     if (!username || !/^[a-z0-9_]+bot$/i.test(username)) throw new StaffingError("Bot staffing belum dikonfigurasi.", 503);

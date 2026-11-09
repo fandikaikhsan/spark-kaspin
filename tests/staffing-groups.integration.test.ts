@@ -4,11 +4,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 const storeA = "10000000-0000-0000-0000-000000000001", storeB = "10000000-0000-0000-0000-000000000002";
 const admin = "20000000-0000-0000-0000-000000000001", manager = "20000000-0000-0000-0000-000000000002";
 const migrationFiles = readdirSync("supabase/migrations").filter(file => file.includes("staffing_")).sort();
-async function setup(excludeLast = false) {
+async function setup(beforeGroupMigration = false) {
   const instance = new PGlite();
   await instance.exec("create role anon;create role authenticated;create role service_role bypassrls;alter default privileges in schema public grant select on tables to service_role;grant usage on schema public to service_role;");
   await instance.exec(readFileSync("supabase/schema.sql", "utf8"));
-  for (const file of excludeLast ? migrationFiles.slice(0, -1) : migrationFiles) await instance.exec(readFileSync("supabase/migrations/" + file, "utf8"));
+  for (const file of beforeGroupMigration ? migrationFiles.filter(file => file < "20261109090000_staffing_group_management.sql") : migrationFiles) await instance.exec(readFileSync("supabase/migrations/" + file, "utf8"));
   return instance;
 }
 let db: PGlite;
@@ -88,7 +88,7 @@ describe("admin Telegram group mapping", () => {
     const isolated = await setup(true);
     try {
       await isolated.exec("insert into stores(name,time_zone,utc_offset)values('Historical store','Asia/Jakarta','+07:00');insert into staffing_groups(chat_id,store_id)select -1001,id from stores;insert into staffing_groups(chat_id,store_id)select -1002,id from stores");
-      await expect(isolated.exec(readFileSync("supabase/migrations/" + migrationFiles.at(-1), "utf8"))).rejects.toThrow("STAFFING_GROUP_DUPLICATE");
+      await expect(isolated.exec(readFileSync("supabase/migrations/" + "20261109090000_staffing_group_management.sql", "utf8"))).rejects.toThrow("STAFFING_GROUP_DUPLICATE");
       await isolated.exec("rollback");
       expect((await isolated.query<{ count: number }>("select count(*)::int as count from staffing_groups")).rows[0].count).toBe(2);
     } finally { await isolated.close(); }

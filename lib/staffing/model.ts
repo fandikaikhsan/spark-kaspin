@@ -1,3 +1,5 @@
+import { storeOffset } from "../store-timezone";
+
 export type Region = { id: string; name: string };
 export type StaffingStore = { id: string; name: string; time_zone: string; active: boolean; region_id: string | null };
 export type Staff = { id: string; code: string; full_name: string; home_store_id: string; active: boolean; telegram_linked: boolean };
@@ -22,7 +24,7 @@ export function localTime(value: string, timeZone: string, includeSeconds = fals
 }
 
 export function storeInstant(value: unknown, timeZone: string): string {
-  const offset = timeZone === "Asia/Jakarta" ? "+07:00" : timeZone === "Asia/Makassar" ? "+08:00" : null;
+  const offset = storeOffset(timeZone);
   if (!offset || typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) throw new Error("Invalid store date/time");
   const date = new Date(`${value}${value.length === 16 ? ":00" : ""}${offset}`);
   if (!Number.isFinite(date.getTime()) || localTime(date.toISOString(), timeZone, value.length === 19) !== value) throw new Error("Invalid store date/time");

@@ -51,6 +51,15 @@ describe("staffing input and authorization", () => {
     expect(normalizeUpdate({ update_id: 1, message: { ...message, chat: { id: 7002, type: "private" }, text: "/saldo" } }, "staffing_bot")).toBeNull();
     expect(normalizeUpdate({ update_id: 2, callback_query: { id: "cb", from: { id: 7002 }, message, data: "sg:2026-02-31" } }, "staffing_bot")).toBeNull();
   });
+  it("normalizes private applications without accepting manager fields or unsupported attachments", () => {
+    const dm = { ...message, chat: { id: 7001, type: "private" }, text: "Alasan pribadi", reply_to_message: { message_id: 90 } };
+    expect(normalizeUpdate({ update_id: 1, message: dm }, "staffing_bot")).toMatchObject({ kind: "request_input", inputText: "Alasan pribadi", replyTo: 90 });
+    expect(normalizeUpdate({ update_id: 1, message: { ...dm, chat: message.chat } }, "staffing_bot")).toBeNull();
+    const document = { file_id: "file", file_unique_id: "unique", mime_type: "application/pdf", file_size: 1000 };
+    expect(normalizeUpdate({ update_id: 1, message: { ...dm, text: undefined, document } }, "staffing_bot")).toMatchObject({ kind: "document", fileMime: "application/pdf" });
+    for (const bad of [{ ...document, file_size: 11 * 1024 * 1024 }, { ...document, mime_type: "text/html" }]) expect(normalizeUpdate({ update_id: 1, message: { ...dm, text: undefined, document: bad } }, "staffing_bot")).toBeNull();
+    expect(normalizeUpdate({ update_id: 1, callback_query: { id: "cb", from: { id: 7001 }, message: dm, data: "rf:type:abcdef012345:admin", amount: 999999 } }, "staffing_bot")).toBeNull();
+  });
   it("converts store-local midnight across UTC days and rejects impossible dates", () => {
     expect(storeInstant("2026-11-08T00:30", "Asia/Makassar")).toBe("2026-11-07T16:30:00.000Z");
     expect(localTime("2026-11-07T16:30:00.000Z", "Asia/Jakarta")).toBe("2026-11-07T23:30");

@@ -1,4 +1,5 @@
 "use client";
+import { storeOffset } from "@/lib/store-timezone";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -41,7 +42,7 @@ export function AttendanceControls({ session }: { session: ReviewedSession }) {
   const validTimes = !!entered && (!exited || exited >= entered) && (!session.check_out_at || !!exited);
   const locked = !!session.payroll_locked;
   const canSave = dirty && note.trim().length >= 5 && validTimes && !locked && !busy && !saved;
-  const offset = session.time_zone === "Asia/Jakarta" ? "+07:00" : "+08:00";
+  const offset = storeOffset(session.time_zone);
   const preview = { ...session, corrected_in_at: entered ? entered + offset : null, corrected_out_at: exited ? exited + offset : null };
   function changed() { setSaved(false); setError(""); }
   async function submit(event: FormEvent) {
