@@ -695,3 +695,20 @@ node --env-file=.env scripts/staffing-telegram-setup.mjs --url https://dashboard
 ```
 
 Untuk menerapkan menu baru gunakan command yang sama dengan `--apply`. Script memeriksa identitas bot dan tujuan webhook sebelum mengubah konfigurasi. Tidak perlu Lambda / webhook baru. Jangan jalankan `--apply` sebelum versi aplikasi dan database yang baru siap.
+
+## Review absensi dengan anomali waktu
+
+Jalankan `supabase/migrations/20261120160000_staffing_attendance_anomaly_review.sql`, lalu `supabase/checks/staffing-attendance-anomaly-review-postflight.sql`; semua kolom harus `true`. Gunakan migration baru ini, jangan mengulang migration lama. Deploy aplikasi yang memuat modal konfirmasi dan validasi payroll bersama perubahan database.
+
+- Detail review menampilkan peringatan merah yang spesifik: durasi lebih dari 48 jam, pulang sebelum masuk, atau waktu masuk / pulang di masa depan. Waktu memakai timezone store.
+- **Tolak absensi** dapat disimpan tanpa konfirmasi tambahan walaupun ada anomali; catatan tetap opsional.
+- **Konfirmasi absensi** membuka modal sebelum menyimpan. Jika waktu anomali, modal menampilkan alasan dan meminta persetujuan eksplisit melalui **Ya, terima absensi**. Backend juga memeriksa persetujuan ini; tidak cukup hanya melewati tampilan UI.
+- Review tetap menyimpan data asli, pembaruan waktu, identitas reviewer, dan anomali yang diterima dalam audit. Notifikasi hasil review tetap hanya ke chat pribadi staf.
+- Jam masuk kosong / checkout asli yang dihapus, perubahan data oleh reviewer lain, akses di luar region, dan periode payroll final tetap diblokir.
+- Menerima anomali bukan persetujuan lembur. Jam pulang sebelum masuk perlu dikoreksi sebelum finalisasi payroll; waktu di masa depan dan persetujuan lembur tetap mengikuti aturan payroll yang berlaku.
+
+## Activities mingguan dan antrean review
+
+Jalankan `supabase/migrations/20261120180000_staffing_weekly_activities.sql`, lalu `supabase/checks/staffing-weekly-activities-postflight.sql` (semua kolom `true`). Deploy aplikasi yang memuat Activities mingguan dan badge notifikasi baru. Migration ini menambahkan fungsi baca; tidak mengubah data staf, jadwal, absensi, atau payroll.
+
+Kehadiran menampilkan Senin–Minggu. Gunakan panah kiri / kanan untuk bergeser satu minggu, pilih tanggal mana pun untuk membuka minggunya, atau klik **Minggu ini**. Awal / akhir minggu dihitung sesuai timezone masing-masing store. **Antrean Review** dan badge notifikasi menampilkan seluruh absensi yang belum direview dalam cakupan akses, termasuk minggu-minggu sebelumnya, sehingga task tidak hilang saat minggu berganti. Filter store tetap berlaku.

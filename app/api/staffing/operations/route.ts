@@ -1,5 +1,6 @@
 import { operationsRpc, operate, staffId, payrollPreview } from "@/lib/staffing/operations-service";
 import { staffingResponse, StaffingError } from "@/lib/staffing/service";
+import { validMonday } from "@/lib/staffing/schedule";
 import { validDate } from "@/lib/staffing/operations-model";
 export const dynamic="force-dynamic";
 export async function GET(request:Request){try{
@@ -9,7 +10,10 @@ export async function GET(request:Request){try{
  case"home":data=await operationsRpc("staffing_home");break;
  case"roster":data=await operationsRpc("staffing_roster");break;
  case"staff":data=await operationsRpc("staffing_staff_detail",{p_staff:staffId(p.get("staff"))});break;
- case"activity":if(p.get("day")&&!validDate(p.get("day")))throw new StaffingError("Tanggal tidak valid.",400);data=await operationsRpc("staffing_activity",{p_store:p.get("store")?staffId(p.get("store")):null,p_day:p.get("day")||null});break;
+ case"activity":if(p.get("week")){
+  if(!validMonday(p.get("week")!))throw new StaffingError("Minggu aktivitas tidak valid. Pilih awal minggu Senin.",400);
+  data=await operationsRpc("staffing_activity_week",{p_store:p.get("store")?staffId(p.get("store")):null,p_week:p.get("week")});
+ }else{if(p.get("day")&&!validDate(p.get("day")))throw new StaffingError("Tanggal tidak valid.",400);data=await operationsRpc("staffing_activity",{p_store:p.get("store")?staffId(p.get("store")):null,p_day:p.get("day")||null});}break;
  case"payroll":data=await payrollPreview(p.get("staff"),p.get("from"),p.get("to"));break;
  default:throw new StaffingError("Halaman tidak tersedia.",404);}
  return Response.json(data,{headers:{"Cache-Control":"no-store"}});

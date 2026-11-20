@@ -28,6 +28,7 @@ export function calculatePayroll(input: PayrollInput, now = new Date()): Payroll
     const effectiveIn=session.corrected_in_at||session.check_in_at;
     const effectiveOut=session.corrected_out_at||session.check_out_at;
     if(!effectiveOut){result.blockers.push(`Sesi ${session.label} belum memiliki checkout.`);continue;}
+    if(seconds(effectiveOut)<seconds(effectiveIn)){result.blockers.push(`Urutan waktu absensi ${session.label} tidak valid. Koreksi sebelum finalisasi payroll.`);continue;}
     const from=Math.max(periodStart,seconds(effectiveIn)),to=Math.min(periodEnd,seconds(effectiveOut));
     if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from)continue;
     if(to>Math.floor(now.getTime()/1000))result.blockers.push("Ada waktu absensi di masa depan.");

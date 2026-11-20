@@ -19,7 +19,7 @@ export type ShiftChangeRequest = {
  status: string; valid: boolean; created_at: string; expires_at: string; shift_snapshot: Shift; other_snapshot: Shift | null;
 };
 export type OvertimeRequest = { id:string;staff_id:string;session_id:string;full_name:string;store_name:string;time_zone:string;day:string;reason:string;intervals:{starts_at:string;ends_at:string}[];valid:boolean;attendance_confirmed:boolean;created_at:string;status:string };
-export type ActivityData = { rows: ActivityRow[]; requests: StaffRequest[]; shift_requests?: ShiftChangeRequest[]; overtime_requests?: OvertimeRequest[] };
+export type ActivityData = { week_start?: string; week_end?: string; pending_attendance?: ActivityRow[]; rows: ActivityRow[]; requests: StaffRequest[]; shift_requests?: ShiftChangeRequest[]; overtime_requests?: OvertimeRequest[] };
 export type HomeStats = { staff_count: number; active_staff: number; pending_requests: number; pending_attendance: number; committed_shifts: number; open_sessions: number };
 export function requestNeedsAction(request: Pick<StaffRequest, "kind" | "status">): boolean {
   return request.status === "pending" || (request.kind === "cash_advance" && request.status === "approved");

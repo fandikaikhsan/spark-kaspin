@@ -108,7 +108,7 @@ describe("staffing rollout against an existing POS database", () => {
   });
   it("uses sortable, unique Staffing timestamps in dependency order", async () => {
     const sorted = readdirSync(directory).filter(file => file.includes("staffing")).sort();
-    expect(sorted).toEqual([...migrations, "20261109180000_staffing_self_service.sql", "20261109200000_staffing_request_amendment.sql", "20261109210000_staffing_payroll_documents_proxy.sql", "20261111170000_staffing_warnings.sql", "20261111190000_staffing_point_adjustments.sql", "20261120120000_staffing_telegram_simplification.sql", "20261120140000_staffing_group_attendance.sql"]);
+    expect(sorted).toEqual([...migrations, "20261109180000_staffing_self_service.sql", "20261109200000_staffing_request_amendment.sql", "20261109210000_staffing_payroll_documents_proxy.sql", "20261111170000_staffing_warnings.sql", "20261111190000_staffing_point_adjustments.sql", "20261120120000_staffing_telegram_simplification.sql", "20261120140000_staffing_group_attendance.sql", "20261120160000_staffing_attendance_anomaly_review.sql", "20261120180000_staffing_weekly_activities.sql"]);
     expect(sorted.every(file => /^\d{14}_/.test(file))).toBe(true);
     const isolated = await baseline();
     try { await expect(isolated.exec(sql(sorted[1]))).rejects.toThrow(/staffing_shifts/); }
@@ -150,7 +150,7 @@ describe("staffing rollout against an existing POS database", () => {
       const file = join(directory, "preflight.json"); writeFileSync(file, JSON.stringify(initialReport));
       const result = spawnSync(process.execPath, ["scripts/staffing-migrations.mjs", "--manual", "--preflight", file], { encoding: "utf8" });
       expect(result.status).toBe(0);
-      const plan = JSON.parse(result.stdout); expect(plan.pending).toHaveLength(14); expect(plan.preflightAccepted).toBe(true);
+      const plan = JSON.parse(result.stdout); expect(plan.pending).toHaveLength(16); expect(plan.preflightAccepted).toBe(true);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
