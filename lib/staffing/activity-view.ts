@@ -1,4 +1,5 @@
 import { localTime } from "./model";
+import { mondayOf, addDays } from "./schedule";
 import type { ActivityRow, ReviewedSession } from "./operations-model";
 
 export type Presence = "working" | "overdue" | "completed" | "waiting" | "upcoming" | "leave" | "rejected";
@@ -24,4 +25,12 @@ export function attendanceMatches(session: ReviewedSession, filters: { query: st
   return text.includes(filters.query.trim().toLocaleLowerCase("id-ID")) &&
     (filters.review === "all" || session.verification_state === filters.review) &&
     (!filters.from || day >= filters.from) && (!filters.to || day <= filters.to);
+}
+
+export function activityWeek(now: Date, zone: string): string {
+  return mondayOf(localTime(now.toISOString(), zone).slice(0, 10));
+}
+export function activityWeekLabel(week: string): string {
+  const format = (date: string) => date.slice(8, 10) + "/" + date.slice(5, 7) + "/" + date.slice(0, 4);
+  return `${format(week)} – ${format(addDays(week, 6))}`;
 }

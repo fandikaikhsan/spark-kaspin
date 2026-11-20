@@ -997,3 +997,8 @@ input[type="date"] {
 .ops-queue-shortcuts { margin:18px 0; } .ops-queue-shortcuts .ops-secondary { gap:10px; }
 
 .ops-absence-fines { border-top:1px solid var(--line); margin-top:22px; padding-top:20px; } .ops-absence-fines .ops-record>.ops-link { margin-left:12px; }
+
+.ops-activity-week-nav { display:flex; align-items:flex-end; gap:8px; }
+.ops-activity-week-nav>.ops-icon-button { align-self:flex-end; flex-shrink:0; }
+.ops-activity-scope>p strong { color:var(--ink); font-size:.8rem; }
+@media(max-width:600px) { .ops-activity-week-nav{width:100%}.ops-activity-week-nav>label{flex:1} }
