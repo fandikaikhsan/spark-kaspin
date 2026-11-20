@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { boundedFetch, flushStaffingNotifications, staffingBotConflictsWithPos } from "./notifications";
+import { resolveAttendanceTargets, type AttendanceDirectoryEntry } from "./attendance-targets";
 import { normalizeUpdate, verifyWebhookSecret, type TelegramUpdate } from "./telegram";
 
 type Event = { body?: string | null; isBase64Encoded?: boolean; headers?: Record<string, string | undefined>; flush?: boolean; requestContext?: unknown };
@@ -15,8 +16,8 @@ export async function handleStaffingWebhook(event: Event, context?: StaffingRunt
   const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!token || !username || !url || !secret || staffingBotConflictsWithPos()) return { statusCode: 503, body: "Staffing configuration unavailable" };
   const db = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: boundedFetch(AbortSignal.timeout(8000)) } });
-  async function telegram(method: string, payload: Record<string, unknown>) {
-    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8000) });
+  async function telegram(method: string, payload: Record<string, unknown>, signal = AbortSignal.timeout(8000)) {
+    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error("Telegram delivery failed");
     return result.result;
@@ -27,8 +28,14 @@ export async function handleStaffingWebhook(event: Event, context?: StaffingRunt
       try { update = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body || "", "base64").toString("utf8") : event.body || "{}"); }
       catch { return { statusCode: 400, body: "Invalid update" }; }
       if (!update || typeof update !== "object" || Array.isArray(update) || !Number.isSafeInteger(update.update_id) || update.update_id < 0) return { statusCode: 400, body: "Invalid update" };
-      const normalized = normalizeUpdate(update, username);
+      let normalized = normalizeUpdate(update, username);
       if (normalized) {
+        if (normalized.attendeeRefs) {
+          const directory = await db.rpc("staffing_attendance_directory", {p_user:normalized.userId,p_chat:normalized.chatId});
+          if (directory.error) throw new Error("Attendance directory unavailable");
+          const deadline = AbortSignal.timeout(6000);
+          normalized = await resolveAttendanceTargets(normalized, directory.data as AttendanceDirectoryEntry[], async userId => telegram("getChatMember", {chat_id:normalized!.chatId,user_id:userId}, deadline));
+        }
         const result = await db.rpc("staffing_apply_update", { p_update: normalized });
         if (result.error) throw new Error("Attendance transaction failed");
       }

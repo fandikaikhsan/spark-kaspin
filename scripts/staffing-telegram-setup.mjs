@@ -7,7 +7,7 @@ const webhookUrl=urlIndex>=0?argv[urlIndex+1]:process.env.STAFFING_TELEGRAM_WEBH
 const username=process.env.STAFFING_TELEGRAM_BOT_USERNAME?.trim();
 const token=process.env.STAFFING_TELEGRAM_BOT_TOKEN?.trim();
 const secret=process.env.STAFFING_TELEGRAM_WEBHOOK_SECRET?.trim();
-const group=[['masuk','Check-in sendiri /masuk KODE_STAF'],['pulang','Checkout sendiri /pulang KODE_STAF'],['jadwal','Jadwal committed store'],['tukar','Minta pengganti / tukar shift'],['batal','Batalkan proses aktif'],['bantuan','Panduan penggunaan']];
+const group=[['masuk','Masuk sendiri /masuk saya @rekan'],['pulang','Pulang sendiri /pulang saya @rekan'],['jadwal','Jadwal committed store'],['tukar','Minta pengganti / tukar shift'],['batal','Batalkan proses aktif'],['bantuan','Panduan penggunaan']];
 const personal=[['start','Tautkan akun / mulai'],['menu','Menu pribadi'],['jadwal','Jadwal saya'],['absen','Riwayat absensi saya'],['izin','Ajukan izin / sakit'],['lembur','Ajukan lembur'],['batal','Batalkan pengisian'],['bantuan','Panduan penggunaan']];
 function fail(message){console.error(message);process.exit(1);}
 let parsed;try{parsed=new URL(webhookUrl);}catch{fail('Isi --url dengan HTTPS endpoint /api/telegram/staffing dari dashboard.');}

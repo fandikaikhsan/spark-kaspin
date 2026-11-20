@@ -32,7 +32,7 @@ export function StaffProfile({ detail, canConfigure, initialTab = "jadwal" }: { 
   const profile = detail.profile;
   const warningPoints = Number(detail.warning_points?.balance ?? detail.discipline.reduce((sum, entry) => sum + entry.points, 0));
   const actionCounts: Record<string, number> = {
-    jadwal: detail.sessions.filter(session => session.verification_state === "pending").length,
+    jadwal: detail.sessions.filter(session => (session.verification_state === "pending" || (session.is_unscheduled && session.verification_state !== "rejected"))).length,
     izin: detail.requests.filter(request => request.kind !== "cash_advance" && requestNeedsAction(request)).length,
     keuangan: detail.requests.filter(request => request.kind === "cash_advance" && requestNeedsAction(request)).length,
   };

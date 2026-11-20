@@ -24,4 +24,6 @@ describe('automatic payroll calculator',()=>{
  it('requires an explicit rule and future periods remain preview only',()=>{const source=input();source.rule=null;expect(calculatePayroll(source,now).blockers).toHaveLength(1);source.rule=rule;expect(calculatePayroll(source,new Date('2026-10-15T00:00:00Z')).blockers.join(' ')).toContain('belum berakhir');});
  it('blocks final payroll for confirmed inverted timestamps instead of silently skipping the session',()=>{const source=input();source.sessions[0].corrected_out_at='2026-10-05T17:00:00+07:00';const result=calculatePayroll(source,now);expect(result.blockers.join(' ')).toContain('Urutan waktu absensi');expect(result.gross_pay).toBe(0);source.sessions[0].verification_state='rejected';expect(calculatePayroll(source,now).blockers).toEqual([]);});
 
+ it('pays explicitly approved unscheduled overtime at the full overtime rate without also paying normal hours',()=>{const source=input();source.sessions[0].overtime_only=true;source.time_approvals=[{id:'ot',session_id:'s',kind:'overtime',starts_at:source.sessions[0].starts_at,ends_at:source.sessions[0].ends_at,reason:'Manager approved outside attendance'}];const result=calculatePayroll(source,now);expect(result.normal_pay).toBe(0);expect(result.night_pay).toBe(0);expect(result.overtime_pay).toBe(130000);expect(result.overtime_hours).toBe(8);});
+
 });
