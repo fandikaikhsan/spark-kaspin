@@ -653,3 +653,41 @@ limit 20;
 - [ ] Percobaan dari akun lain, command palsu dan klik berulang tidak mengubah data tanpa izin.
 
 Untuk arsitektur produksi yang dipilih, gunakan [runbook dashboard webhook](staffing-dashboard-webhook.md); contoh stack standalone terdahulu bukan instruksi menambah Lambda baru. Folder `/tmp` pada panduan ini dipakai untuk tes dan dapat dibersihkan sistem. Untuk operasi permanen, simpan konfigurasi pada secret/environment deployment yang dikelola dan jalankan tahapan rollout produksi setelah pengujian nyata lulus. Migration remote, AWS deployment, webhook serta real Telegram tetap perlu diverifikasi pada lingkungan tujuan; hasil tes lokal tidak menggantikannya.
+
+## Pembaruan alur Telegram: verifikasi pribadi dan lembur
+
+Migration tambahan: `supabase/migrations/20261120120000_staffing_telegram_simplification.sql`.
+Jalankan setelah fondasi Telegram sampai `20261109210000_staffing_payroll_documents_proxy.sql`; fitur ini tidak bergantung pada migration Peringatan, tetapi source lengkap tetap menyimpan urutan seluruh migration. Jangan ulang file yang sudah diterapkan. Setelah berhasil, jalankan `supabase/checks/staffing-telegram-simplification-postflight.sql`; semua kolom harus `true`. Deploy aplikasi yang memuat perubahan payroll, parser callback, antrean lembur, dan notifikasi bersama migration ini.
+
+Alur terbaru menggantikan langkah verifikasi grup pada bagian pengujian lama:
+
+1. `/masuk` atau `/pulang` dimulai di grup store. Staf yang sudah ditautkan menerima konfirmasi di **chat pribadi bot**. Untuk absensi diwakilkan, pelapor menerima konfirmasi dan mengirim bukti; identitas pelapor tetap dicatat.
+2. Konfirmasi shift, reply lokasi, lalu reply foto di chat pribadi. Bukti lengkap harus masuk dalam 10 menit dari command awal; waktu command tetap menjadi waktu absensi. Grup menerima satu pesan hasil pencatatan. Verifikasi lama yang sudah dimulai sebelum migration tetap dapat diselesaikan di grup asal sampai kedaluwarsa; command baru memakai chat pribadi.
+3. `/jadwal` grup menampilkan cabang dan tanggal sekali, nama biasa, serta jam. Baris dipisahkan menurut rentang jam mulai lokal yang sama dengan warna scheduling: 00–06, 06–12, 12–18, 18–24. Shift lintas tanggal tetap menampilkan tanggal akhir. Kalender tombol tujuh hari tetap tersedia.
+4. `/tukar` tetap di grup. Setiap langkah pemilihan punya tombol Batal. Ringkasan men-mention staf terkait dengan ID akun yang ditautkan, bukan username yang dapat berubah. Pihak kedua harus bersedia sebelum permintaan muncul di antrean manager. Persetujuan manager mengubah jadwal committed; `/jadwal` berikutnya membaca penugasan baru.
+5. Manager membuka **Activities → Perubahan shift**, atau notifikasi Perubahan shift, untuk melihat seluruh permintaan yang menunggu manager dalam cakupan aksesnya. Pengajuan yang belum disetujui pihak kedua belum masuk antrean ini. Request yang lewat batas persetujuan perlu diajukan ulang.
+6. Chat pribadi memakai `/menu`, `/jadwal`, `/absen` (alias lama `/absensi` tetap didukung), `/izin`, `/lembur`, `/bantuan`. Kasbon, saldo keuangan, dan penghasilan disembunyikan, termasuk tombol lama; implementasi historis disimpan untuk kemungkinan diaktifkan kembali. Dashboard keuangan manager tetap tersedia.
+7. `/izin` menampilkan saldo dan status. **Ajukan izin / sakit** hanya memilih Izin atau Sakit; Izin menggunakan saldo berbayar setelah manager menyetujui. Isi tanggal mulai / akhir, alasan, bukti, lalu konfirmasi. Setiap prompt punya tombol Batal. Teks / dokumen pribadi hanya diproses oleh state pengajuan milik pengirim, bukan sebagai instruksi mengubah tarif, plafon, atau hak akses.
+8. `/lembur` → tanggal mulai shift → alasan → konfirmasi interval yang dihitung sistem. Absensi harus sudah memiliki waktu pulang. Bila ada lebih dari satu shift pada tanggal yang sama, pilih shift terkait. Sistem memakai penugasan committed saat ini, termasuk hasil penggantian / tukar shift, dan menghitung selisih aktual sebelum / sesudah jadwal. Tidak ada input nominal atau durasi dari staf.
+9. Manager membuka **Activities → Pengajuan lembur** atau notifikasi Lembur. Konfirmasi review absensi terlebih dahulu, lalu setujui / tolak pengajuan. Review absensi sendiri tidak lagi mengesahkan lembur pada policy baru. Hanya interval lembur yang disetujui yang dibayar. Koreksi waktu berikutnya membatalkan persetujuan interval terkait dan meminta staf mengajukan ulang. Waktu lembur yang sudah dicatat secara eksplisit sebelum fitur ini tetap didukung.
+10. Payroll tidak dapat difinalisasi jika masih ada pengajuan izin / sakit atau lembur yang menunggu keputusan dalam periode terkait. Payroll yang sudah final tetap memakai snapshot lama.
+
+### Denda kasus ketidakhadiran
+
+Keputusan produk: **manager menentukan nominal per kasus setelah verifikasi**, tanpa angka bawaan Rp50.000. Angka Rp50.000 dalam PDF aturan adalah catatan lama per SP, bukan aturan otomatis untuk izin ditolak.
+
+- Izin ditolak tidak otomatis menjadi denda. Waktu tidak bekerja tidak menghasilkan upah; keterlambatan mengikuti aturan payroll yang telah diatur.
+- Dari detail staf → Izin & sakit → buka pengajuan yang ditolak → **Catat denda setelah verifikasi**. Isi tanggal kasus, nominal, alasan / dasar denda, dan centang verifikasi.
+- Sistem memerlukan jadwal yang sudah berakhir dengan waktu kerja yang tidak dipenuhi, tidak boleh ada izin disetujui pada tanggal itu, dan review absensi harus selesai. Manager harus memiliki akses ke staf dan store yang terdampak.
+- Satu kasus hanya boleh memiliki satu denda aktif. Klik ulang dengan identitas permintaan sama tidak menggandakan denda. Nominal muncul pada riwayat keuangan dan komponen payroll terpisah **Denda kasus terverifikasi**.
+- Kesalahan pencatatan dapat dibatalkan dengan alasan sebelum payroll final. Catatan awal tetap tersedia; setelah final, perubahan periode tersebut diblokir. Staf menerima pemberitahuan pribadi untuk pencatatan dan pembatalan denda.
+
+### Memperbarui daftar command bot setelah deploy
+
+Setelah migration dan deploy berhasil, jalankan script setup dengan environment lokal yang sudah terisi. Default dry-run:
+
+```sh
+node --env-file=.env scripts/staffing-telegram-setup.mjs --url https://dashboard.sarkop.sparkfoodservice.com/api/telegram/staffing
+```
+
+Untuk menerapkan menu baru gunakan command yang sama dengan `--apply`. Script memeriksa identitas bot dan tujuan webhook sebelum mengubah konfigurasi. Tidak perlu Lambda / webhook baru. Jangan jalankan `--apply` sebelum versi aplikasi dan database yang baru siap.

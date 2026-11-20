@@ -53,10 +53,10 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
       const kind = ({ c: "confirm", x: "cancel", r: "report" } as const)[parts[1] as "c" | "x" | "r"];
       return kind ? { ...base, kind, attemptId: parts[2] } : null;
     }
-    if (parts[0] === "rq" && parts.length === 2 && ["leave", "cash"].includes(parts[1])) return { ...base, kind: "request_start", choice: parts[1] };
+    if (parts[0] === "rq" && parts.length === 2 && ["leave", "cash", "overtime"].includes(parts[1])) return { ...base, kind: "request_start", choice: parts[1] };
     if (parts[0] === "rf" && parts.length === 4 && /^[a-f0-9]{12}$/.test(parts[2]) &&
       ((parts[1] === "type" && ["paid_leave", "unpaid_leave", "sick"].includes(parts[3])) ||
-       (parts[1] === "send" && parts[3] === "yes"))) return { ...base, kind: "request_pick", choice: parts[1], flowToken: parts[2], entityId: parts[3] };
+       (["send", "cancel"].includes(parts[1]) && parts[3] === "yes") || (parts[1] === "session" && uuid.test(parts[3])))) return { ...base, kind: "request_pick", choice: parts[1], flowToken: parts[2], entityId: parts[3] };
     if (parts[0] === "sg" && parts.length === 2 && /^\d{4}-\d{2}-\d{2}$/.test(parts[1])) {
       const date = new Date(parts[1] + "T00:00:00Z");
       return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === parts[1] ? { ...base, kind: "schedule", scheduleDate: parts[1] } : null;
@@ -64,8 +64,8 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
     if (parts[0] === "sm" && parts.length === 2 && Object.hasOwn(menuKinds, parts[1])) return { ...base, kind: menuKinds[parts[1] as keyof typeof menuKinds] };
     if (parts[0] === "sx" && parts.length === 4 && /^[a-f0-9]{12}$/.test(parts[2])) {
       const [ , choice, flowToken, entityId] = parts;
-      if (!["mode", "shift", "person", "other", "page"].includes(choice)) return null;
-      if (choice === "mode" ? !["replace", "swap"].includes(entityId) : choice === "page" ? !["next", "prev"].includes(entityId) : !uuid.test(entityId)) return null;
+      if (!["mode", "shift", "person", "other", "page", "cancel"].includes(choice)) return null;
+      if (choice === "cancel" ? entityId !== "yes" : choice === "mode" ? !["replace", "swap"].includes(entityId) : choice === "page" ? !["next", "prev"].includes(entityId) : !uuid.test(entityId)) return null;
       return { ...base, kind: "swap_pick", choice, flowToken, entityId };
     }
     if (parts[0] === "sr" && parts.length === 3 && ["y", "n", "x"].includes(parts[1]) && uuid.test(parts[2])) {
@@ -75,14 +75,15 @@ export function normalizeUpdate(update: unknown, botUsername: string): Attendanc
     return null;
   }
   if (typeof message.text === "string") {
-    if (chat.type === "private" && base.replyTo && !message.text.trim().startsWith("/") && message.text.trim().length <= 2000) {
+    if (chat.type === "private" && !message.text.trim().startsWith("/") && message.text.trim().length <= 2000) {
       return { ...base, kind: "request_input", inputText: message.text.trim() };
     }
     const parts = message.text.trim().split(/\s+/);
     if (parts.length > 2) return null;
     const [name, target, extra] = parts[0].split("@");
     if (extra || (target && target.toLowerCase() !== botUsername.toLowerCase())) return null;
-    const commands: Record<string, AttendanceUpdate["kind"]> = { "/start": "start", "/masuk": "check_in", "/pulang": "check_out", "/batal": "cancel", "/jadwal": "schedule", "/menu": "menu", "/saldo": "balance", "/absensi": "history", "/penghasilan": "income", "/izin": "leave_status", "/kasbon": "cash_status", "/tukar": "swap_start", "/bantuan": "help" };
+    const commands: Record<string, AttendanceUpdate["kind"]> = { "/start": "start", "/masuk": "check_in", "/pulang": "check_out", "/batal": "cancel", "/jadwal": "schedule", "/menu": "menu", "/saldo": "balance", "/absensi": "history", "/absen": "history", "/penghasilan": "income", "/izin": "leave_status", "/kasbon": "cash_status", "/tukar": "swap_start", "/bantuan": "help" };
+    if (name === "/lembur" && parts.length === 1 && chat.type === "private") return { ...base, kind: "request_start", choice: "overtime" };
     const kind = commands[name];
     if (parts.length === 2 && (kind === "check_in" || kind === "check_out") && ["group", "supergroup"].includes(String(chat.type)) && /^[A-Za-z0-9._-]{1,40}$/.test(parts[1])) return { ...base, kind: kind === "check_in" ? "proxy_check_in" : "proxy_check_out", attendeeCode: parts[1] };
     if (!kind || (parts.length === 2 && (kind !== "start" || !/^[a-f0-9]{48}$/.test(parts[1])))) return null;

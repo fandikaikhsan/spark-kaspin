@@ -7,7 +7,7 @@ select
  and not has_table_privilege('authenticated','public.staffing_payroll_deliveries','select,insert,update,delete') as delivery_client_access_blocked,
  to_regprocedure('public.staffing_reserve_payroll_delivery(uuid,boolean,uuid,text)')is not null as recipient_reservation_present,
  exists(select 1 from pg_trigger where tgrelid='public.staffing_staff'::regclass and tgname='staffing_payroll_recipient_guard'and tgenabled<>'D')as recipient_pin_enabled,
- position('staffing_attendance_update_v7'in pg_get_functiondef('public.staffing_apply_update(jsonb)'::regprocedure))>0 as proxy_dispatcher_current,
+ (position('staffing_attendance_update_v7'in pg_get_functiondef('public.staffing_apply_update(jsonb)'::regprocedure))>0 or position('staffing_attendance_update_v13'in pg_get_functiondef('public.staffing_apply_update(jsonb)'::regprocedure))>0) as proxy_dispatcher_current,
  exists(select 1 from information_schema.columns where table_schema='public'and table_name='staffing_attempts'and column_name='submitted_by_staff_id') as reporter_identity_present,
  position('Catatan opsional' in pg_get_functiondef('public.staffing_review_attendance(uuid,boolean,jsonb)'::regprocedure))>0
  or position('catatan opsional' in pg_get_functiondef('public.staffing_review_attendance(uuid,boolean,jsonb)'::regprocedure))>0 as review_note_optional,

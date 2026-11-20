@@ -4,15 +4,16 @@ import Link from "next/link";
 import { StaffingHeader } from "./navigation";
 import { OperationForm } from "./operation-form";
 import { AttendanceList, LeaveList } from "./record-lists";
+import { Warnings } from "./warnings";
 import { Finance } from "./finance";
 import { TimeChip } from "./time-chip";
 import { ArrowIcon } from "./modal";
 import { localTime } from "@/lib/staffing/model";
 import { rupiah, requestNeedsAction, type StaffDetail } from "@/lib/staffing/operations-model";
-const tabs = [["jadwal", "Jadwal & Absensi"], ["izin", "Izin & sakit"], ["keuangan", "Keuangan"]];
+const tabs = [["jadwal", "Jadwal & Absensi"], ["izin", "Izin & sakit"], ["keuangan", "Keuangan"], ["peringatan", "Peringatan"]];
 
 export function StaffProfile({ detail, canConfigure, initialTab = "jadwal" }: { detail: StaffDetail; canConfigure: boolean; initialTab?: string }) {
-  const requestedTab = ["kasbon", "bonus", "payroll"].includes(initialTab) ? "keuangan" : initialTab === "absensi" ? "jadwal" : initialTab;
+  const requestedTab = initialTab === "sp" ? "peringatan" : ["kasbon", "bonus", "payroll"].includes(initialTab) ? "keuangan" : initialTab === "absensi" ? "jadwal" : initialTab;
   const [tab, setTab] = useState(tabs.some(([id]) => id === requestedTab) ? requestedTab : "jadwal");
   const [invitation, setInvitation] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -29,6 +30,7 @@ export function StaffProfile({ detail, canConfigure, initialTab = "jadwal" }: { 
   }
   const today = localTime(new Date().toISOString(), detail.store.time_zone).slice(0, 10);
   const profile = detail.profile;
+  const warningPoints = Number(detail.warning_points?.balance ?? detail.discipline.reduce((sum, entry) => sum + entry.points, 0));
   const actionCounts: Record<string, number> = {
     jadwal: detail.sessions.filter(session => session.verification_state === "pending").length,
     izin: detail.requests.filter(request => request.kind !== "cash_advance" && requestNeedsAction(request)).length,
@@ -45,11 +47,12 @@ export function StaffProfile({ detail, canConfigure, initialTab = "jadwal" }: { 
       {inviteError && <p className="ops-error" role="alert">{inviteError}</p>}
       {invitation && <p className="ops-success">Kirim secara pribadi; berlaku 24 jam sekali pakai: <a href={invitation}>{invitation}</a></p>}
     </details>
-    <div className="ops-tabs" role="tablist" aria-label="Detail staff">{tabs.map(([id, label]) => <button key={id} type="button" id={`staff-tab-${id}`} role="tab" aria-selected={tab === id} aria-controls={`staff-panel-${id}`} onClick={() => setTab(id)}>{label}{actionCounts[id] > 0 && <span className="ops-tab-count" aria-label={`${actionCounts[id]} perlu tindakan`}>{actionCounts[id]}</span>}</button>)}</div>
+    <div className="ops-tabs" role="tablist" aria-label="Detail staff">{tabs.map(([id, label]) => <button key={id} type="button" id={`staff-tab-${id}`} role="tab" aria-selected={tab === id} aria-controls={`staff-panel-${id}`} onClick={() => setTab(id)}>{label}{id === "peringatan" && warningPoints > 0 && <span className={`ops-tab-count${warningPoints >= 4 ? " is-action-required" : ""}`} aria-label={`${warningPoints} poin`}>{warningPoints}</span>}{actionCounts[id] > 0 && <span className="ops-tab-count" aria-label={`${actionCounts[id]} perlu tindakan`}>{actionCounts[id]}</span>}</button>)}</div>
     <div role="tabpanel" id={`staff-panel-${tab}`} aria-labelledby={`staff-tab-${tab}`}>
       {tab === "jadwal" && <><section className="ops-panel"><div className="ops-section-heading"><div><h2>Jadwal ter-commit</h2><p className="ops-muted">Tanggal mengikuti timezone store tempat bekerja.</p></div><Link className="ops-inline-link" href="/staffing/schedule">Buka scheduling <ArrowIcon /></Link></div><div className="ops-table-wrap ops-schedule-history" role="region" aria-label="Jadwal staff" tabIndex={0}><table className="ops-table"><thead><tr><th>Shift</th><th>Store</th><th>Mulai</th><th>Selesai</th><th>Status</th></tr></thead><tbody>{detail.shifts.map(s => <tr key={s.id}><td>{s.label}</td><td>{s.store_name}</td><td><TimeChip value={s.starts_at} zone={s.time_zone} /></td><td><TimeChip value={s.ends_at} zone={s.time_zone} /></td><td><span className="ops-badge is-confirmed">Committed</span></td></tr>)}</tbody></table></div>{!detail.shifts.length && <p className="ops-empty">Belum ada jadwal yang di-commit.</p>}</section><AttendanceList sessions={detail.sessions} staffName={profile.full_name} /></>}
       {tab === "izin" && <LeaveList detail={detail} today={today} />}
       {tab === "keuangan" && <Finance detail={detail} today={today} />}
+      {tab === "peringatan" && <Warnings staff={detail} today={today} />}
     </div>
   </main>;
 }
