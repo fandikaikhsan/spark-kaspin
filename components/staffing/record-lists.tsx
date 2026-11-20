@@ -3,6 +3,7 @@ import { useState } from "react";
 import { TimeChip } from "./time-chip";
 import { Modal } from "./modal";
 import { AttendanceChips } from "./attendance-chips";
+import { UnplannedAttendance } from "./unplanned-attendance";
 import { AttendanceControls } from "./attendance-controls";
 import { RequestCard, RequestForm, RequestStatusBadge } from "./requests";
 import { OperationForm } from "./operation-form";
@@ -32,7 +33,7 @@ export function AttendanceList({ sessions, staffName }: { sessions: ReviewedSess
         const entered = s.corrected_in_at || s.check_in_at;
         const exited = s.corrected_out_at || s.check_out_at;
         const late = lateMinutes(s);
-        return <tr key={s.id} className={`ops-clickable-row${s.verification_state === "pending" ? " needs-review" : ""}`} onClick={() => setSelected(s.id)}><td><strong>{localTime(s.starts_at, s.time_zone).slice(0, 10)}</strong><small>{s.store_name}</small></td><td>{s.label}<small>{clock(s.starts_at, s.time_zone)}–{clock(s.ends_at, s.time_zone)}</small><AttendanceChips session={s} /></td><td><TimeChip value={entered} zone={s.time_zone} clockOnly />{s.corrected_in_at && <small>Dikoreksi</small>}</td><td>{exited ? <TimeChip value={exited} zone={s.time_zone} clockOnly /> : "—"}<small>{exited && localTime(exited, s.time_zone).slice(0, 10) !== localTime(entered, s.time_zone).slice(0, 10) ? localTime(exited, s.time_zone).slice(0, 10) : !exited ? "Belum checkout" : ""}</small></td><td>{exited ? `${((Date.parse(exited) - Date.parse(entered)) / 3600000).toFixed(2)} jam` : "Berjalan"}</td><td><span className={`ops-badge ${late ? "is-pending" : "is-confirmed"}`}>{late ? `${late} menit` : "Tepat waktu"}</span></td><td><span className={`ops-badge is-${s.verification_state}`}>{stateLabels[s.verification_state]}</span></td><td><button type="button" className="ops-link" aria-label={`Detail absensi ${s.label} ${localTime(s.starts_at, s.time_zone).slice(0, 10)}`} onClick={e => { e.stopPropagation(); setSelected(s.id); }}>Lihat detail</button></td></tr>;
+        return <tr key={s.id} className={`ops-clickable-row${(s.verification_state === "pending" || (s.is_unscheduled && s.verification_state !== "rejected")) ? " needs-review" : ""}`} onClick={() => setSelected(s.id)}><td><strong>{localTime(s.starts_at, s.time_zone).slice(0, 10)}</strong><small>{s.store_name}</small></td><td>{s.label}<small>{clock(s.starts_at, s.time_zone)}–{clock(s.ends_at, s.time_zone)}</small><AttendanceChips session={s} /></td><td><TimeChip value={entered} zone={s.time_zone} clockOnly />{s.corrected_in_at && <small>Dikoreksi</small>}</td><td>{exited ? <TimeChip value={exited} zone={s.time_zone} clockOnly /> : "—"}<small>{exited && localTime(exited, s.time_zone).slice(0, 10) !== localTime(entered, s.time_zone).slice(0, 10) ? localTime(exited, s.time_zone).slice(0, 10) : !exited ? "Belum checkout" : ""}</small></td><td>{exited ? `${((Date.parse(exited) - Date.parse(entered)) / 3600000).toFixed(2)} jam` : "Berjalan"}</td><td><span className={`ops-badge ${late ? "is-pending" : "is-confirmed"}`}>{s.is_unscheduled ? "Di luar jadwal" : late ? `${late} menit` : "Tepat waktu"}</span></td><td><span className={`ops-badge is-${s.verification_state}`}>{stateLabels[s.verification_state]}</span></td><td><button type="button" className="ops-link" aria-label={`Detail absensi ${s.label} ${localTime(s.starts_at, s.time_zone).slice(0, 10)}`} onClick={e => { e.stopPropagation(); setSelected(s.id); }}>Lihat detail</button></td></tr>;
       })}
     </tbody></table>{!rows.length && <p className="ops-empty">{sessions.length ? "Tidak ada absensi yang cocok dengan filter." : "Belum ada absensi."}</p>}</div>
     {session && <Modal title={staffName} eyebrow="Review & detail absensi" className="ops-person-modal" description={`${session.store_name} · ${session.label}`} onClose={() => setSelected(null)} wide>
@@ -42,7 +43,7 @@ export function AttendanceList({ sessions, staffName }: { sessions: ReviewedSess
 }
 
 export function AttendanceDetails({ session }: { session: ReviewedSession }) {
-  return <AttendanceControls session={session} />;
+  return session.is_unscheduled ? <UnplannedAttendance session={session} /> : <AttendanceControls session={session} />;
 }
 
 export function RequestTable({ requests, onSelect }: { requests: StaffRequest[]; onSelect: (id: string) => void }) {

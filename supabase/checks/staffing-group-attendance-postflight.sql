@@ -4,7 +4,7 @@
 begin transaction read only;
 with definitions as (
  select pg_get_functiondef('public.staffing_attendance_update_v13(jsonb)'::regprocedure) as attendance,
-        pg_get_functiondef('public.staffing_apply_update(jsonb)'::regprocedure) as dispatcher,
+        (pg_get_functiondef('public.staffing_apply_update(jsonb)'::regprocedure)||coalesce(pg_get_functiondef(to_regprocedure('public.staffing_apply_update_v20(jsonb)')),'')) as dispatcher,
         pg_get_functiondef('public.staffing_notify_personal_result()'::regprocedure) as notification
 )
 select

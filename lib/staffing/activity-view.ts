@@ -10,7 +10,10 @@ export const presenceLabels: Record<Presence, string> = {
 export function presenceOf(row: ActivityRow, now: number): Presence {
   if (row.verification_state === "rejected") return "rejected";
   if (row.corrected_out_at || row.check_out_at) return "completed";
-  if (row.corrected_in_at || row.check_in_at) return now > Date.parse(row.ends_at) ? "overdue" : "working";
+  if (row.corrected_in_at || row.check_in_at) {
+    if (row.is_unscheduled) return now - Date.parse(row.corrected_in_at || row.check_in_at!) > 48 * 3600000 ? "overdue" : "working";
+    return now > Date.parse(row.ends_at) ? "overdue" : "working";
+  }
   if (row.approved_leave) return "leave";
   return Date.parse(row.starts_at) > now ? "upcoming" : "waiting";
 }

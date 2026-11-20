@@ -12,6 +12,8 @@ const inside = (mid: number, from: string, to: string) => mid >= seconds(from) &
 export function calculatePayroll(input: PayrollInput, now = new Date()): PayrollResult {
   const result: PayrollResult = { normal_pay:0,night_pay:0,overtime_pay:0,paid_leave_pay:0,sick_pay:0,bonuses:0,gross_pay:0,absence_penalties:0,late_penalties:0,frequency_penalty:0,deductions:0,loan_repayment:0,net_pay:0,normal_hours:0,night_hours:0,overtime_hours:0,late_count:0,blockers:[],notes:["Jam dibayar berdasarkan absensi terkonfirmasi, jadwal, dan pengajuan lembur yang disetujui manager. Istirahat hanya dikurangi bila interval tanpa upah dicatat.","Pembulatan rupiah dilakukan per komponen. Potongan kasbon dibatasi penghasilan bersih tersedia dan plafon potongan per payroll."],lines:[] };
   if(input.pending_leave?.length)result.blockers.push("Masih ada izin / sakit menunggu keputusan manager pada periode ini.");
+  if(input.pending_attendance_batches?.length)result.blockers.push("Masih ada proses verifikasi absensi yang belum selesai.");
+  if(input.unplanned_attendance?.length)result.blockers.push("Masih ada absensi di luar jadwal yang perlu ditangani manager.");
   if(input.pending_overtime?.length)result.blockers.push("Masih ada pengajuan lembur menunggu keputusan manager pada periode ini.");
   const rule=input.rule;
   if(!rule){result.blockers.push("Aturan tarif belum diatur untuk awal periode ini.");return result;}
@@ -52,7 +54,7 @@ export function calculatePayroll(input: PayrollInput, now = new Date()): Payroll
     for(let i=0;i<cuts.length-1;i++){
       const a=cuts[i],b=cuts[i+1],mid=(a+b)/2,duration=b-a;
       if(approvals.some(x=>x.kind==="unpaid_break"&&inside(mid,x.starts_at,x.ends_at)))continue;
-      const scheduled=inside(mid,session.starts_at,session.ends_at);
+      const scheduled=session.overtime_only!==true&&inside(mid,session.starts_at,session.ends_at);
       const ot=(!scheduled&&session.overtime_from_attendance===true&&session.overtime_request_required!==true)||approvals.some(x=>x.kind==="overtime"&&inside(mid,x.starts_at,x.ends_at));
       if(!scheduled&&!ot)continue;
       const clock=localTime(new Date(mid*1000).toISOString(),session.time_zone).slice(11,16);

@@ -41,6 +41,17 @@ export async function operate(action:unknown,input:unknown){
   if(result.status==="stale"||result.status==="expired")throw new StaffingError("Permintaan tidak berlaku karena jadwal berubah, terkunci atau kedaluwarsa. Muat ulang Activities.",409);
   return result;
  }
+ if(action==="review_unplanned"||action==="resolve_unplanned"){
+  staffId(data.session_id);staffId(data.client_id);
+  const context=await operationsRpc<{time_zone:string}>("staffing_unplanned_context",{p_session:data.session_id});
+  const {storeInstant}=await import("./model");
+  data.correct_times=data.correct_times===true;data.acknowledge_time_anomalies=data.acknowledge_time_anomalies===true;
+  try{
+   if(data.correct_times){data.check_in_at=storeInstant(data.check_in_local,context.time_zone);data.check_out_at=data.check_out_local?storeInstant(data.check_out_local,context.time_zone):null;}
+   if(action==="resolve_unplanned"&&data.mode==="schedule"){data.starts_at=storeInstant(data.starts_local,context.time_zone);data.ends_at=storeInstant(data.ends_local,context.time_zone);}
+  }catch{throw new StaffingError("Isi waktu sesuai timezone store.",400);}
+  return operationsRpc(action==="review_unplanned"?"staffing_review_unplanned":"staffing_resolve_unplanned",{p_data:data});
+ }
  if(action==="review_attendance"||action==="attendance_review"){
   staffId(data.session_id);staffId(data.client_id);
   data.correct_times=data.correct_times===true;

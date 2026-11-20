@@ -10,7 +10,7 @@ async function rows<T=Record<string,unknown>>(sql:string,args:unknown[]=[]){retu
 async function val<T=unknown>(sql:string,args:unknown[]=[]):Promise<T>{return(await rows<{v:T}>(sql,args))[0]?.v;}
 async function manage(action:string,data:object){return val<{id:string}>('select staffing_manage(null,true,$1,$2::jsonb)as v',[action,JSON.stringify(data)]);}
 function u(kind:AttendanceUpdate['kind'],extra:Partial<AttendanceUpdate>={}):AttendanceUpdate{return{kind,updateId:++seq,userId:7001,chatId:7001,chatType:'private',messageId:++msg,replyTo:null,sentAt:new Date().toISOString(),timestampSource:'telegram_message',...extra};}
-async function apply(kind:AttendanceUpdate['kind'],extra:Partial<AttendanceUpdate>={}){const x=u(kind,extra);await db.query('select staffing_apply_update($1::jsonb)',[JSON.stringify(x)]);return x;}
+async function apply(kind:AttendanceUpdate['kind'],extra:Partial<AttendanceUpdate>={}){const x=u(kind,extra);const rpc=['check_in','check_out','proxy_check_in','proxy_check_out'].includes(kind)?'staffing_apply_update_v20':'staffing_apply_update';await db.query(`select ${rpc}($1::jsonb)`,[JSON.stringify(x)]);return x;}
 async function group(kind:AttendanceUpdate['kind'],extra:Partial<AttendanceUpdate>={}){return apply(kind,{chatId:-1001,chatType:'supergroup',...extra});}
 async function drain(){for(let n=0;n<150;n++){const r=await rows<{id:number}>('select * from staffing_claim_outbox()');if(!r.length)return;await db.query('select staffing_deliver_outbox($1,$2)',[r[0].id,++msg]);}}
 async function flow(){return(await rows<{token:string;step:string;prompt_message_id:number;data:Record<string,unknown>}>('select * from staffing_private_flows where user_id=7001'))[0];}
@@ -33,7 +33,7 @@ describe('compact Telegram menus and schedules',()=>{
  it('uses only Izin / Sakit, supports a cancel button and preserves the submitted history',async()=>{await apply('request_start',{choice:'leave'});await drain();expect(await val("select payload->>'text'as v from staffing_outbox order by id desc limit 1")).toBe('Pilih Izin atau Sakit.');expect(await val("select (payload->'reply_markup')::text as v from staffing_outbox order by id desc limit 1")).not.toMatch(/unpaid|berbayar/);await pick('type','paid_leave');const f=await flow();await apply('request_pick',{choice:'cancel',entityId:'yes',flowToken:f.token,userId:7002,chatId:7002});expect(await flow()).toBeTruthy();await pick('cancel','yes');expect(await flow()).toBeUndefined();});
  it('normalizes aliases, cancellation and private request input without granting any manager mutation',()=>{const message={message_id:1,date:Math.floor(Date.now()/1000),chat:{id:7001,type:'private'},from:{id:7001}};expect(normalizeUpdate({update_id:1,message:{...message,text:'/absen'}},'TestBot')?.kind).toBe('history');expect(normalizeUpdate({update_id:2,message:{...message,text:'/lembur'}},'TestBot')).toMatchObject({kind:'request_start',choice:'overtime'});expect(normalizeUpdate({update_id:3,message:{...message,text:'ubah plafon saya 999999'}},'TestBot')).toMatchObject({kind:'request_input'});});
 });
-describe('attendance in the store group with private manager review', () => {
+describe('pre-batch attendance compatibility with private manager review', () => {
  type Attempt = { id: string; state: string; prompt_message_id: number; verification_chat_id: number };
  async function attempt() { return (await rows<Attempt>('select * from staffing_attempts order by received_at desc limit 1'))[0]; }
  async function currentShift() {
