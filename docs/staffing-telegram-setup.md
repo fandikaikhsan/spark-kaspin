@@ -654,15 +654,19 @@ limit 20;
 
 Untuk arsitektur produksi yang dipilih, gunakan [runbook dashboard webhook](staffing-dashboard-webhook.md); contoh stack standalone terdahulu bukan instruksi menambah Lambda baru. Folder `/tmp` pada panduan ini dipakai untuk tes dan dapat dibersihkan sistem. Untuk operasi permanen, simpan konfigurasi pada secret/environment deployment yang dikelola dan jalankan tahapan rollout produksi setelah pengujian nyata lulus. Migration remote, AWS deployment, webhook serta real Telegram tetap perlu diverifikasi pada lingkungan tujuan; hasil tes lokal tidak menggantikannya.
 
-## Pembaruan alur Telegram: verifikasi pribadi dan lembur
+## Pembaruan alur Telegram: verifikasi grup dan lembur
 
 Migration tambahan: `supabase/migrations/20261120120000_staffing_telegram_simplification.sql`.
 Jalankan setelah fondasi Telegram sampai `20261109210000_staffing_payroll_documents_proxy.sql`; fitur ini tidak bergantung pada migration Peringatan, tetapi source lengkap tetap menyimpan urutan seluruh migration. Jangan ulang file yang sudah diterapkan. Setelah berhasil, jalankan `supabase/checks/staffing-telegram-simplification-postflight.sql`; semua kolom harus `true`. Deploy aplikasi yang memuat perubahan payroll, parser callback, antrean lembur, dan notifikasi bersama migration ini.
 
-Alur terbaru menggantikan langkah verifikasi grup pada bagian pengujian lama:
+Koreksi kanal absensi setelah migration di atas: jalankan **`supabase/migrations/20261120140000_staffing_group_attendance.sql`**, lalu jalankan **`supabase/checks/staffing-group-attendance-postflight.sql`**. Semua kolom postflight harus `true`. Jangan mengulang migration sebelumnya yang sudah berhasil. Migration koreksi mengganti fungsi routing; tidak mengubah / menghapus catatan absensi existing. Tidak perlu mengganti webhook atau mendaftarkan command lagi untuk koreksi ini.
 
-1. `/masuk` atau `/pulang` dimulai di grup store. Staf yang sudah ditautkan menerima konfirmasi di **chat pribadi bot**. Untuk absensi diwakilkan, pelapor menerima konfirmasi dan mengirim bukti; identitas pelapor tetap dicatat.
-2. Konfirmasi shift, reply lokasi, lalu reply foto di chat pribadi. Bukti lengkap harus masuk dalam 10 menit dari command awal; waktu command tetap menjadi waktu absensi. Grup menerima satu pesan hasil pencatatan. Verifikasi lama yang sudah dimulai sebelum migration tetap dapat diselesaikan di grup asal sampai kedaluwarsa; command baru memakai chat pribadi.
+Versi sebelumnya sempat mengirim verifikasi ke pribadi. Sesi pribadi yang sudah dimulai tetap dapat diselesaikan di chat asal sampai batas 10 menitnya habis, atau dibatalkan di sana lalu mengulang command di grup. Semua percobaan baru menggunakan grup.
+
+Alur yang berlaku setelah migration koreksi:
+
+1. `/masuk` atau `/pulang`, konfirmasi shift, reply lokasi, dan reply foto semuanya dilakukan di **grup store**. Untuk absensi diwakilkan, pelapor mengonfirmasi dan mengirim bukti; identitas pelapor tetap dicatat. Rekan di grup dapat melihat bukti kehadiran / kepulangan.
+2. Bukti lengkap harus masuk dalam 10 menit dari command awal; waktu command tetap menjadi waktu absensi. Hasil pencatatan muncul di grup. Setelah admin / manager mereview, hasil konfirmasi, penolakan, atau koreksi dikirim **hanya ke chat pribadi staf**, bukan grup.
 3. `/jadwal` grup menampilkan cabang dan tanggal sekali, nama biasa, serta jam. Baris dipisahkan menurut rentang jam mulai lokal yang sama dengan warna scheduling: 00–06, 06–12, 12–18, 18–24. Shift lintas tanggal tetap menampilkan tanggal akhir. Kalender tombol tujuh hari tetap tersedia.
 4. `/tukar` tetap di grup. Setiap langkah pemilihan punya tombol Batal. Ringkasan men-mention staf terkait dengan ID akun yang ditautkan, bukan username yang dapat berubah. Pihak kedua harus bersedia sebelum permintaan muncul di antrean manager. Persetujuan manager mengubah jadwal committed; `/jadwal` berikutnya membaca penugasan baru.
 5. Manager membuka **Activities → Perubahan shift**, atau notifikasi Perubahan shift, untuk melihat seluruh permintaan yang menunggu manager dalam cakupan aksesnya. Pengajuan yang belum disetujui pihak kedua belum masuk antrean ini. Request yang lewat batas persetujuan perlu diajukan ulang.

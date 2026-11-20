@@ -33,10 +33,110 @@ describe('compact Telegram menus and schedules',()=>{
  it('uses only Izin / Sakit, supports a cancel button and preserves the submitted history',async()=>{await apply('request_start',{choice:'leave'});await drain();expect(await val("select payload->>'text'as v from staffing_outbox order by id desc limit 1")).toBe('Pilih Izin atau Sakit.');expect(await val("select (payload->'reply_markup')::text as v from staffing_outbox order by id desc limit 1")).not.toMatch(/unpaid|berbayar/);await pick('type','paid_leave');const f=await flow();await apply('request_pick',{choice:'cancel',entityId:'yes',flowToken:f.token,userId:7002,chatId:7002});expect(await flow()).toBeTruthy();await pick('cancel','yes');expect(await flow()).toBeUndefined();});
  it('normalizes aliases, cancellation and private request input without granting any manager mutation',()=>{const message={message_id:1,date:Math.floor(Date.now()/1000),chat:{id:7001,type:'private'},from:{id:7001}};expect(normalizeUpdate({update_id:1,message:{...message,text:'/absen'}},'TestBot')?.kind).toBe('history');expect(normalizeUpdate({update_id:2,message:{...message,text:'/lembur'}},'TestBot')).toMatchObject({kind:'request_start',choice:'overtime'});expect(normalizeUpdate({update_id:3,message:{...message,text:'ubah plafon saya 999999'}},'TestBot')).toMatchObject({kind:'request_input'});});
 });
-describe('group command with private attendance verification',()=>{
- it('sends prompts only to the command actor, and records command time after complete private evidence',async()=>{const id=(await manage('shift',{staff_id:alice,store_id:store,label:'Now',starts_at:new Date(Date.now()-3600000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString()})).id;const command=await group('check_in');await drain();let a=(await rows<{id:string;prompt_message_id:number}>('select * from staffing_attempts'))[0];expect(await val("select (payload->>'chat_id')::bigint as v from staffing_outbox order by id desc limit 1")).toBe(7001);await group('confirm',{attemptId:a.id});expect(await val('select state as v from staffing_attempts')).toBe('confirmation');await apply('confirm',{attemptId:a.id,userId:7002,chatId:7002});expect(await val('select state as v from staffing_attempts')).toBe('confirmation');await apply('confirm',{attemptId:a.id,sentAt:null});await drain();a=(await rows<typeof a>('select * from staffing_attempts'))[0];await apply('location',{replyTo:a.prompt_message_id,latitude:-.8,longitude:119.8});await drain();a=(await rows<typeof a>('select * from staffing_attempts'))[0];await apply('photo',{replyTo:a.prompt_message_id,fileId:'photo',fileUniqueId:'unique'});expect(await val('select check_in_at as v from staffing_sessions')).toEqual(new Date(command.sentAt!));expect(await val('select shift_id as v from staffing_sessions')).toBe(id);const groupMessages=await rows<{payload:{text:string}}>("select payload from staffing_outbox where payload->>'chat_id'='-1001'");expect(groupMessages).toHaveLength(1);expect(groupMessages[0].payload.text).toMatch(/^Alice <test> waktu masuk tercatat \d{2}\/\d{2} \d{2}:\d{2}:\d{2}\. Lokasi dan foto diterima\.$/);});
- it('lets a verification started before the migration finish in its original group',async()=>{await manage('shift',{staff_id:alice,store_id:store,label:'Legacy flow',starts_at:new Date(Date.now()-3600000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString()});await group('check_in');await db.query('update staffing_attempts set verification_chat_id=null');await drain();let a=(await rows<{id:string;prompt_message_id:number}>('select * from staffing_attempts'))[0];await group('confirm',{attemptId:a.id});await drain();expect(await val("select (payload->>'chat_id')::bigint as v from staffing_outbox order by id desc limit 1")).toBe(-1001);a=(await rows<typeof a>('select * from staffing_attempts'))[0];await group('location',{replyTo:a.prompt_message_id,latitude:0,longitude:0});await drain();a=(await rows<typeof a>('select * from staffing_attempts'))[0];await group('photo',{replyTo:a.prompt_message_id,fileId:'legacy-proof',fileUniqueId:'legacy-unique'});expect(await val('select count(*)::int as v from staffing_sessions')).toBe(1);});
- it('does not start attendance from a private command and allows private cancellation',async()=>{await apply('check_in');expect(await val('select count(*)::int as v from staffing_attempts')).toBe(0);await manage('shift',{staff_id:alice,store_id:store,label:'Now',starts_at:new Date(Date.now()-3600000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString()});await group('check_in');await apply('cancel');expect(await val('select state as v from staffing_attempts')).toBe('cancelled');});
+describe('attendance in the store group with private manager review', () => {
+ type Attempt = { id: string; state: string; prompt_message_id: number; verification_chat_id: number };
+ async function attempt() { return (await rows<Attempt>('select * from staffing_attempts order by received_at desc limit 1'))[0]; }
+ async function currentShift() {
+  return manage('shift', {staff_id:alice,store_id:store,label:'Now',
+   starts_at:new Date(Date.now()-3600000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString()});
+ }
+ async function finish(privateChat=false) {
+  const send=privateChat?apply:group;
+  let a=await attempt();
+  await send('confirm',{attemptId:a.id,sentAt:null}); await drain();
+  a=await attempt();
+  await send('location',{replyTo:a.prompt_message_id,latitude:-.8,longitude:119.8}); await drain();
+  a=await attempt();
+  await send('photo',{replyTo:a.prompt_message_id,fileId:'proof',fileUniqueId:'unique'});
+ }
+ it('passes the corrected channel postflight',async()=>{
+  const result=await db.exec(readFileSync('supabase/checks/staffing-group-attendance-postflight.sql','utf8'));
+  const resultRows=result.flatMap(r=>r.rows);
+  expect(resultRows).toHaveLength(1);
+  expect(Object.values(resultRows[0]).every(v=>v===true)).toBe(true);
+ });
+ it('keeps check-in and checkout confirmation, location, photo and receipts in the group',async()=>{
+  const shift=await currentShift();
+  for (const kind of ['check_in','check_out'] as const) {
+   const command=await group(kind); await drain();
+   const a=await attempt(); expect(Number(a.verification_chat_id)).toBe(-1001);
+   await finish();
+   expect(await val(`select ${kind==='check_in'?'check_in_at':'check_out_at'} as v from staffing_sessions`)).toEqual(new Date(command.sentAt!));
+   const prompts=await rows<{payload:{chat_id:number;reply_parameters?:{message_id:number};text:string}}>(
+    'select payload from staffing_outbox where attempt_id=$1 order by id',[a.id]);
+   expect(prompts).toHaveLength(3);
+   for (const {payload} of prompts) expect(payload.chat_id).toBe(-1001);
+   for (const {payload} of prompts.slice(1)) expect(payload.reply_parameters?.message_id).toBe(command.messageId);
+  }
+  expect(await val('select shift_id as v from staffing_sessions')).toBe(shift.id);
+  const destinations=await val<number[]>("select jsonb_agg(distinct payload->'chat_id') as v from staffing_outbox");
+  expect(destinations).toEqual([-1001]);
+  const receipts=await rows<{text:string}>("select payload->>'text' as text from staffing_outbox where payload->>'text' like '%Lokasi dan foto diterima.%'");
+  expect(receipts).toHaveLength(2);
+  expect(receipts[1].text).toMatch(/^Alice <test> waktu pulang tercatat/);
+ });
+ it('binds group confirmation and evidence to the initiating staff and original group',async()=>{
+  await currentShift(); await group('check_in'); await drain();
+  let a=await attempt();
+  await apply('confirm',{attemptId:a.id});
+  await group('confirm',{attemptId:a.id,userId:7002});
+  await group('confirm',{attemptId:a.id,chatId:-1002});
+  expect((await attempt()).state).toBe('confirmation');
+  await group('confirm',{attemptId:a.id,sentAt:null}); await drain(); a=await attempt();
+  await apply('location',{replyTo:a.prompt_message_id,latitude:0,longitude:0});
+  await group('location',{replyTo:a.prompt_message_id,userId:7002,latitude:0,longitude:0});
+  expect((await attempt()).state).toBe('location');
+  await group('location',{replyTo:a.prompt_message_id,latitude:0,longitude:0}); await drain(); a=await attempt();
+  await apply('photo',{replyTo:a.prompt_message_id,fileId:'private',fileUniqueId:'private'});
+  await group('photo',{replyTo:a.prompt_message_id,userId:7002,fileId:'other',fileUniqueId:'other'});
+  expect(await val('select count(*)::int as v from staffing_sessions')).toBe(0);
+  await group('photo',{replyTo:a.prompt_message_id,fileId:'own',fileUniqueId:'own'});
+  expect(await val('select count(*)::int as v from staffing_sessions')).toBe(1);
+ });
+ it('allows an older group attempt with a null destination to finish',async()=>{
+  await currentShift(); await group('check_in');
+  await db.query('update staffing_attempts set verification_chat_id=null'); await drain();
+  await finish(); expect(await val('select count(*)::int as v from staffing_sessions')).toBe(1);
+ });
+ it('allows an already-started private attempt to finish without moving its evidence to the group',async()=>{
+  await currentShift(); await group('check_in');
+  // Emulate an attempt and confirmation queued by migration 13 before the correction.
+  await db.query('update staffing_attempts set verification_chat_id=7001');
+  await db.query("update staffing_outbox set payload=jsonb_set(payload,'{chat_id}','7001') where attempt_id is not null");
+  await drain(); const a=await attempt();
+  await group('confirm',{attemptId:a.id}); expect((await attempt()).state).toBe('confirmation');
+  await finish(true);
+  expect(await val('select count(*)::int as v from staffing_sessions')).toBe(1);
+  const prompts=await rows<{payload:{chat_id:number;reply_parameters?:unknown}}>('select payload from staffing_outbox where attempt_id=$1',[a.id]);
+  expect(prompts).toHaveLength(3);
+  for (const {payload} of prompts) {expect(payload.chat_id).toBe(7001);expect(payload.reply_parameters).toBeUndefined();}
+ });
+ it('starts only in groups, cancels there and expires incomplete evidence after ten minutes',async()=>{
+  await apply('check_in'); expect(await val('select count(*)::int as v from staffing_attempts')).toBe(0);
+  await currentShift(); await group('check_in');
+  await apply('cancel'); expect((await attempt()).state).toBe('confirmation');
+  await group('cancel'); expect((await attempt()).state).toBe('cancelled');
+  await group('check_in'); await drain();
+  const a=await attempt(); await db.query("update staffing_attempts set expires_at=now()-interval '1 second' where id=$1",[a.id]);
+  await group('confirm',{attemptId:a.id}); expect((await attempt()).state).toBe('cancelled');
+  expect(await val('select count(*)::int as v from staffing_sessions')).toBe(0);
+ });
+ it('sends manager confirmation, correction and rejection only to the staff private chat',async()=>{
+  await currentShift(); await group('check_in'); await drain(); await finish();
+  await group('check_out'); await drain(); await finish();
+  const id=await val<string>('select id as v from staffing_sessions');
+  for (const [index,state] of ['confirmed','confirmed','rejected'].entries()) {
+   const meta=await val<{review_version:string}>('select staffing_attendance_metadata($1) as v',[id]);
+   const last=await val<number>('select max(id)::int as v from staffing_outbox');
+   const data={session_id:id,client_id:`30000000-0000-0000-0000-00000000000${index+1}`,version:meta.review_version,state,note:'',correct_times:index===1,
+    check_in_at:new Date(Date.now()-10000).toISOString(),check_out_at:new Date().toISOString()};
+   await db.query('select staffing_review_attendance($1,false,$2::jsonb)',[manager,JSON.stringify(data)]);
+   const notifications=await rows<{payload:{chat_id:number;text:string}}>('select payload from staffing_outbox where id>$1',[last]);
+   expect(notifications).toHaveLength(1);
+   expect(notifications[0].payload.chat_id).toBe(7001);
+   expect(notifications[0].payload.text).toContain('Review absensi');
+  }
+ });
 });
 describe('shift consent, mentions and manager queue',()=>{
  it('provides owner-bound cancellation during selection',async()=>{await group('swap_start');const f=(await rows<{token:string}>('select token from staffing_swap_flows'))[0];await group('swap_pick',{choice:'cancel',flowToken:f.token,entityId:'yes',userId:7002});expect(await val('select count(*)::int as v from staffing_swap_flows')).toBe(1);await group('swap_pick',{choice:'cancel',flowToken:f.token,entityId:'yes'});expect(await val('select count(*)::int as v from staffing_swap_flows')).toBe(0);});
