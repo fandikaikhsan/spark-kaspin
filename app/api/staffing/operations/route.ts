@@ -5,6 +5,7 @@ export const dynamic="force-dynamic";
 export async function GET(request:Request){try{
  const p=new URL(request.url).searchParams;let data;
  switch(p.get("view")){
+ case"request_fines":data=await operationsRpc("staffing_request_fines",{p_request:staffId(p.get("request"))});break;
  case"home":data=await operationsRpc("staffing_home");break;
  case"roster":data=await operationsRpc("staffing_roster");break;
  case"staff":data=await operationsRpc("staffing_staff_detail",{p_staff:staffId(p.get("staff"))});break;

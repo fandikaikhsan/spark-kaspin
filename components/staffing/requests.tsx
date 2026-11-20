@@ -1,4 +1,5 @@
 "use client";
+import { AbsenceFines } from "./absence-fines";
 import { RequestEvidence } from "./request-evidence";
 import{useState}from"react";
 import { RequestEditor } from "./request-editor";
@@ -29,5 +30,5 @@ export function RequestCard({request:provided,onSaved}:{request:StaffRequest;onS
  {request.evidence_file_id && <RequestEvidence id={request.id} pdf={request.evidence_mime === "application/pdf"} />}
  {request.kind!=="cash_advance"&&<details><summary>Tanggal yang dihitung</summary>{request.leave_dates.map(d=><p className="ops-muted"key={d.date}>{d.date} · {d.units} hari</p>)}</details>}
  {request.kind==="emergency"&&<p className="ops-muted">Upah: {request.payment_mode==="leave"?"Izin berbayar, mengurangi saldo":request.payment_mode==="sick"?"Tarif sakit":"Tanpa upah"}</p>}{request.document_note&&<p className="ops-muted">Bukti: {request.document_note}</p>}{request.affected_shifts!==undefined&&request.kind!=="cash_advance"&&<p className="ops-impact">{request.affected_shifts} shift terjadwal terdampak</p>}{request.decision_note&&<p className="ops-muted">Keputusan: {request.decision_note}</p>}{request.original_values&&<div className="notice"><strong>Pengajuan awal</strong><p>{request.kind==="cash_advance"?rupiah(request.original_values.amount):`${request.original_values.start_date} — ${request.original_values.end_date} · ${request.original_values.days} hari`}</p><p>Koreksi terakhir: {request.amendment_note}</p></div>}
- {editing&&request.status==="pending"?<RequestEditor key={`${request.id}:${request.revision??0}`} request={request} onCancel={()=>setEditing(false)} onSaved={next=>{setLocal({...request,...next});setEditing(false);onSaved?.();}}/>:<RequestActions request={request}/>}</article>;
+ {editing&&request.status==="pending"?<RequestEditor key={`${request.id}:${request.revision??0}`} request={request} onCancel={()=>setEditing(false)} onSaved={next=>{setLocal({...request,...next});setEditing(false);onSaved?.();}}/>:<RequestActions request={request}/>}{request.status==="rejected"&&request.kind!=="cash_advance"&&<AbsenceFines request={request}/>}</article>;
 }

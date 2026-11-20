@@ -32,7 +32,7 @@ export async function createPayrollPdf(data: PayrollDocumentData): Promise<Uint8
   line(data.staff_name,16,bold); line(`Kode staf: ${data.staff_code}`); line(`Store: ${data.store_name} | ${data.time_zone}`);
   const date = (value:string) => value.split("-").reverse().join("/");
   line(`Periode: ${date(data.period_start)} - ${date(data.period_end)}`); y-=14;
-  const rows:[string,number][] = [["Upah normal",data.result.normal_pay],["Upah malam",data.result.night_pay],["Lembur",data.result.overtime_pay],["Izin berbayar",data.result.paid_leave_pay],["Sakit berbayar",data.result.sick_pay],["Bonus / THR",data.result.bonuses],["Total bruto",data.result.gross_pay],["Penalti durasi",data.result.late_penalties],["Penalti frekuensi",data.result.frequency_penalty],["Total potongan",data.result.deductions],["Pengembalian kasbon",data.result.loan_repayment],["GAJI BERSIH",data.result.net_pay]];
+  const rows:[string,number][] = [["Upah normal",data.result.normal_pay],["Upah malam",data.result.night_pay],["Lembur",data.result.overtime_pay],["Izin berbayar",data.result.paid_leave_pay],["Sakit berbayar",data.result.sick_pay],["Bonus / THR",data.result.bonuses],["Total bruto",data.result.gross_pay],["Penalti durasi",data.result.late_penalties],["Penalti frekuensi",data.result.frequency_penalty],["Denda kasus terverifikasi",data.result.absence_penalties||0],["Total potongan",data.result.deductions],["Pengembalian kasbon",data.result.loan_repayment],["GAJI BERSIH",data.result.net_pay]];
   for (const [label,amount] of rows) {
     room();
     const total = ["Total bruto","Total potongan","GAJI BERSIH"].includes(label), face = total ? bold : font;

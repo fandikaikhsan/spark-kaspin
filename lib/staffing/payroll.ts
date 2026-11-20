@@ -7,10 +7,12 @@ const roundRatio = (numerator: bigint, denominator: bigint) => Number((numerator
 const inside = (mid: number, from: string, to: string) => mid >= seconds(from) && mid < seconds(to);
 
 // Money is accumulated as integer rupiah*seconds and rounded only per component.
-// A manager-confirmed review can approve actual time outside the schedule.
+// Explicit overtime requests approve excess time; legacy review-based approvals remain compatible.
 // Existing explicit overtime intervals remain supported for historical records.
 export function calculatePayroll(input: PayrollInput, now = new Date()): PayrollResult {
-  const result: PayrollResult = { normal_pay:0,night_pay:0,overtime_pay:0,paid_leave_pay:0,sick_pay:0,bonuses:0,gross_pay:0,late_penalties:0,frequency_penalty:0,deductions:0,loan_repayment:0,net_pay:0,normal_hours:0,night_hours:0,overtime_hours:0,late_count:0,blockers:[],notes:["Jam dibayar berdasarkan absensi terkonfirmasi, jadwal, dan lembur yang disetujui melalui review waktu aktual. Istirahat hanya dikurangi bila interval tanpa upah dicatat.","Pembulatan rupiah dilakukan per komponen. Potongan kasbon dibatasi penghasilan bersih tersedia dan plafon potongan per payroll."],lines:[] };
+  const result: PayrollResult = { normal_pay:0,night_pay:0,overtime_pay:0,paid_leave_pay:0,sick_pay:0,bonuses:0,gross_pay:0,absence_penalties:0,late_penalties:0,frequency_penalty:0,deductions:0,loan_repayment:0,net_pay:0,normal_hours:0,night_hours:0,overtime_hours:0,late_count:0,blockers:[],notes:["Jam dibayar berdasarkan absensi terkonfirmasi, jadwal, dan pengajuan lembur yang disetujui manager. Istirahat hanya dikurangi bila interval tanpa upah dicatat.","Pembulatan rupiah dilakukan per komponen. Potongan kasbon dibatasi penghasilan bersih tersedia dan plafon potongan per payroll."],lines:[] };
+  if(input.pending_leave?.length)result.blockers.push("Masih ada izin / sakit menunggu keputusan manager pada periode ini.");
+  if(input.pending_overtime?.length)result.blockers.push("Masih ada pengajuan lembur menunggu keputusan manager pada periode ini.");
   const rule=input.rule;
   if(!rule){result.blockers.push("Aturan tarif belum diatur untuk awal periode ini.");return result;}
   if(input.rule_changes.length)result.blockers.push("Aturan berubah di tengah periode. Pisahkan periode pada tanggal perubahan aturan.");
@@ -50,7 +52,7 @@ export function calculatePayroll(input: PayrollInput, now = new Date()): Payroll
       const a=cuts[i],b=cuts[i+1],mid=(a+b)/2,duration=b-a;
       if(approvals.some(x=>x.kind==="unpaid_break"&&inside(mid,x.starts_at,x.ends_at)))continue;
       const scheduled=inside(mid,session.starts_at,session.ends_at);
-      const ot=(!scheduled&&session.overtime_from_attendance===true)||approvals.some(x=>x.kind==="overtime"&&inside(mid,x.starts_at,x.ends_at));
+      const ot=(!scheduled&&session.overtime_from_attendance===true&&session.overtime_request_required!==true)||approvals.some(x=>x.kind==="overtime"&&inside(mid,x.starts_at,x.ends_at));
       if(!scheduled&&!ot)continue;
       const clock=localTime(new Date(mid*1000).toISOString(),session.time_zone).slice(11,16);
       const start=rule.night_start.slice(0,5),end=rule.night_end.slice(0,5);
@@ -90,7 +92,8 @@ export function calculatePayroll(input: PayrollInput, now = new Date()): Payroll
   result.bonuses=input.bonuses.reduce((sum,b)=>sum+Number(b.amount),0);
   result.gross_pay=result.normal_pay+result.night_pay+result.overtime_pay+result.paid_leave_pay+result.sick_pay+result.bonuses;
   if(rule.frequency_enabled){const tier=[...rule.frequency_tiers].reverse().find(t=>result.late_count>=t.count);result.frequency_penalty=tier?.amount||0;}
-  result.deductions=result.late_penalties+result.frequency_penalty;
+  result.absence_penalties=(input.absence_fines||[]).filter(f=>!f.voided_at&&f.fine_date>=input.period_start&&f.fine_date<=input.period_end).reduce((sum,f)=>sum+Number(f.amount),0);
+  result.deductions=result.late_penalties+result.frequency_penalty+result.absence_penalties;
   const available=result.gross_pay-result.deductions;
   if(available<0)result.blockers.push("Potongan melebihi penghasilan. Tinjau aturan sebelum finalisasi.");
   result.loan_repayment=Math.min(Number(input.outstanding),Math.max(0,available),rule.loan_repayment_cap===null?Number.MAX_SAFE_INTEGER:Number(rule.loan_repayment_cap));

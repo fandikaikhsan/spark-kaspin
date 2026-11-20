@@ -6,7 +6,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function staffId(value:unknown):string {if(typeof value!=="string"||!uuid.test(value))throw new StaffingError("Identitas tidak valid.",400);return value;}
 export async function operationsRpc<T>(name:string,args:Record<string,unknown>={}):Promise<T>{
  const {data,error}=await getSupabaseAdmin().rpc(name,{...await staffingActor(),...args});
- if(error){if(error.message.includes("FORBIDDEN"))throw new StaffingError("Access denied",403);if(error.message.includes("REQUEST_STALE"))throw new StaffingError("Pengajuan berubah sejak dibuka. Tutup dan buka kembali detail sebelum mengedit.",409);if(error.message.includes("ATTENDANCE_STALE"))throw new StaffingError("Absensi berubah sejak modal dibuka. Tutup dan buka kembali sebelum menyimpan.",409);if(error.message.includes("PAYROLL_STALE"))throw new StaffingError("Data payroll berubah. Hitung ulang preview sebelum finalisasi.",409);if(["PGRST202","42P01","42703","42883"].includes(error.code||""))throw new StaffingError("Fitur belum diaktifkan. Hubungi administrator.",503);if(error.code==="P0001")throw new StaffingError(error.message,400);if(error.code==="23505")throw new StaffingError("Data sudah tercatat.",409);throw new StaffingError("Periksa data dan coba kembali.",400);}return data as T;
+ if(error){if(error.message.includes("FORBIDDEN"))throw new StaffingError("Access denied",403);if(error.message.includes("WARNING_STALE"))throw new StaffingError("Surat berubah sejak dibuka. Muat ulang sebelum menyimpan / menerbitkan.",409);if(error.message.includes("POINTS_STALE"))throw new StaffingError("Saldo poin berubah. Muat ulang riwayat sebelum melanjutkan.",409);if(error.message.includes("REQUEST_STALE"))throw new StaffingError("Pengajuan berubah sejak dibuka. Tutup dan buka kembali detail sebelum mengedit.",409);if(error.message.includes("ATTENDANCE_STALE"))throw new StaffingError("Absensi berubah sejak modal dibuka. Tutup dan buka kembali sebelum menyimpan.",409);if(error.message.includes("PAYROLL_STALE"))throw new StaffingError("Data payroll berubah. Hitung ulang preview sebelum finalisasi.",409);if(["PGRST202","42P01","42703","42883"].includes(error.code||""))throw new StaffingError("Fitur belum diaktifkan. Hubungi administrator.",503);if(error.code==="P0001")throw new StaffingError(error.message,400);if(error.code==="23505")throw new StaffingError("Data sudah tercatat.",409);throw new StaffingError("Periksa data dan coba kembali.",400);}return data as T;
 }
 function period(from:unknown,to:unknown){if(!validDate(from)||!validDate(to)||to<from||(Date.parse(to)-Date.parse(from))/86400000>61)throw new StaffingError("Pilih periode valid, maksimal 62 hari.",400);return{from,to};}
 export async function payrollPreview(id:unknown,from:unknown,to:unknown){const dates=period(from,to);const source=await operationsRpc<{input:PayrollInput;version:string}>("staffing_payroll_source",{p_staff:staffId(id),p_from:dates.from,p_to:dates.to});return{version:source.version,result:calculatePayroll(source.input),rule:source.input.rule,period_start:dates.from,period_end:dates.to};}
@@ -22,6 +22,19 @@ export async function operate(action:unknown,input:unknown){
    if(!Array.isArray(data.leave_dates)||data.leave_dates.length<1||data.leave_dates.length>62)throw new StaffingError("Pilih tanggal izin yang dihitung.",400);
   }
   return operationsRpc("staffing_amend_request",{p_data:data});
+ }
+ if(action==="record_absence_fine"||action==="void_absence_fine"){
+  staffId(action==="record_absence_fine"?data.request_id:data.fine_id);
+  if(action==="record_absence_fine"){
+   staffId(data.client_id);if(!validDate(data.fine_date)||!Number.isSafeInteger(Number(data.amount))||Number(data.amount)<1||Number(data.amount)>1000000000)throw new StaffingError("Periksa tanggal dan nominal denda.",400);
+   data.amount=Number(data.amount);data.verified=data.verified===true||data.verified==="on";
+  }
+  return operationsRpc(action==="record_absence_fine"?"staffing_record_absence_fine":"staffing_void_absence_fine",{p_data:data});
+ }
+ if(action==="decide_overtime"){
+  staffId(data.request_id);
+  if(!["approved","rejected"].includes(String(data.decision)))throw new StaffingError("Pilih keputusan lembur.",400);
+  return operationsRpc("staffing_decide_overtime",{p_request:data.request_id,p_decision:data.decision,p_note:data.note||""});
  }
  if(action==="decide_shift"){
   const result=await operationsRpc<{id:string;status:string}>("staffing_decide_shift",{p_request:staffId(data.request_id),p_decision:data.decision,p_note:data.note});
